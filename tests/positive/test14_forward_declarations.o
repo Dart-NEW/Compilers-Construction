@@ -1,0 +1,60 @@
+class ForwardDeclarations is
+    var value : Integer(0)
+    
+    this() is
+        value := Integer(0)
+        testForwardDeclarations()
+    end
+    
+    method testForwardDeclarations is
+        var result1 : methodA()
+        var result2 : methodB(result1)
+        var result3 : methodC(result2)
+    end
+    
+    method methodA : Integer is
+        return Integer(10)
+    end
+    
+    method methodB(param: Integer) : Integer is
+        return param.Plus(Integer(5))
+    end
+    
+    method methodC(param: Integer) : Integer is
+        return param.Mult(Integer(2))
+    end
+    
+    method recursiveMethod(n: Integer) : Integer is
+        if n.LessEqual(Integer(1)) then
+            return Integer(1)
+        else
+            var prev : recursiveMethod(n.Minus(Integer(1)))
+            return n.Mult(prev)
+        end
+    end
+    
+    method mutualRecursionA(n: Integer) : Integer is
+        if n.Equal(Integer(0)) then
+            return Integer(1)
+        else
+            return mutualRecursionB(n.Minus(Integer(1)))
+        end
+    end
+    
+    method mutualRecursionB(n: Integer) : Integer is
+        if n.Equal(Integer(0)) then
+            return Integer(0)
+        else
+            return mutualRecursionA(n.Minus(Integer(1))).Plus(Integer(1))
+        end
+    end
+end
+
+class TestForwardDeclarations is
+    this() is
+        var forward : ForwardDeclarations()
+        
+        var factorial : forward.recursiveMethod(Integer(5))
+        var mutual : forward.mutualRecursionA(Integer(4))
+    end
+end

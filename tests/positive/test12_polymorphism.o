@@ -1,0 +1,95 @@
+class Shape is
+    var area : Real(0.0)
+    
+    this() is
+        area := Real(0.0)
+    end
+    
+    method calculateArea : Real is
+        return area
+    end
+    
+    method draw : String is
+        return String("Drawing a shape")
+    end
+end
+
+class Circle extends Shape is
+    var radius : Real(0.0)
+    
+    this(r: Real) is
+        radius := r
+        area := radius.Mult(radius).Mult(Real(3.14159))
+    end
+    
+    method calculateArea : Real is
+        return radius.Mult(radius).Mult(Real(3.14159))
+    end
+    
+    method draw : String is
+        return String("Drawing a circle")
+    end
+    
+    method getRadius : Real is
+        return radius
+    end
+end
+
+class Rectangle extends Shape is
+    var width : Real(0.0)
+    var height : Real(0.0)
+    
+    this(w: Real, h: Real) is
+        width := w
+        height := h
+        area := width.Mult(height)
+    end
+    
+    method calculateArea : Real is
+        return width.Mult(height)
+    end
+    
+    method draw : String is
+        return String("Drawing a rectangle")
+    end
+    
+    method getWidth : Real is
+        return width
+    end
+    
+    method getHeight : Real is
+        return height
+    end
+end
+
+class ShapeRenderer is
+    this() is
+        var shapes : Array[Shape](3)
+        
+        var circle : Circle(Real(5.0))
+        var rectangle : Rectangle(Real(4.0), Real(6.0))
+        var anotherCircle : Circle(Real(3.0))
+        
+        shapes.set(Integer(0), circle)
+        shapes.set(Integer(1), rectangle)
+        shapes.set(Integer(2), anotherCircle)
+        
+        renderShapes(shapes)
+    end
+    
+    method renderShapes(shapes: Array[Shape]) is
+        var i : Integer(0)
+        while i.Less(shapes.Length()) loop
+            var shape : shapes.get(i)
+            var area : shape.calculateArea()
+            var drawing : shape.draw()
+            i := i.Plus(Integer(1))
+        end
+    end
+end
+
+class TestPolymorphism is
+    this() is
+        var renderer : ShapeRenderer()
+    end
+end

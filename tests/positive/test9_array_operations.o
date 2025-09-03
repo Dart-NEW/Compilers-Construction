@@ -1,0 +1,75 @@
+class ArrayProcessor is
+    var numbers : Array[Integer](10)
+    var names : Array[String](5)
+    
+    this() is
+        numbers := Array[Integer](10)
+        names := Array[String](5)
+        initializeArrays()
+    end
+    
+    method initializeArrays is
+        var i : Integer(0)
+        while i.Less(numbers.Length()) loop
+            numbers.set(i, i.Mult(Integer(2)))
+            i := i.Plus(Integer(1))
+        end
+        
+        i := Integer(0)
+        while i.Less(names.Length()) loop
+            names.set(i, String("Item"))
+            i := i.Plus(Integer(1))
+        end
+    end
+    
+    method findMax : Integer is
+        var max : numbers.get(Integer(0))
+        var i : Integer(1)
+        
+        while i.Less(numbers.Length()) loop
+            var current : numbers.get(i)
+            if current.Greater(max) then
+                max := current
+            end
+            i := i.Plus(Integer(1))
+        end
+        
+        return max
+    end
+    
+    method calculateSum : Integer is
+        var sum : Integer(0)
+        var i : Integer(0)
+        
+        while i.Less(numbers.Length()) loop
+            sum := sum.Plus(numbers.get(i))
+            i := i.Plus(Integer(1))
+        end
+        
+        return sum
+    end
+    
+    method reverseArray : Array[Integer] is
+        var reversed : Array[Integer](numbers.Length())
+        var i : Integer(0)
+        var j : numbers.Length().Minus(Integer(1))
+        
+        while i.Less(numbers.Length()) loop
+            reversed.set(i, numbers.get(j))
+            i := i.Plus(Integer(1))
+            j := j.Minus(Integer(1))
+        end
+        
+        return reversed
+    end
+end
+
+class TestArrayOperations is
+    this() is
+        var processor : ArrayProcessor()
+        
+        var maxValue : processor.findMax()
+        var totalSum : processor.calculateSum()
+        var reversed : processor.reverseArray()
+    end
+end

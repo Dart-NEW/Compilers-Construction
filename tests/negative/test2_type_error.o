@@ -1,0 +1,33 @@
+class TypeError is
+    var intVar : Integer(10)
+    var boolVar : Boolean(true)
+    var realVar : Real(3.14)
+    
+    this() is
+        // Type mismatch: trying to assign Boolean to Integer
+        intVar := boolVar
+        
+        // Type mismatch: trying to assign Real to Boolean
+        boolVar := realVar
+        
+        // Invalid method call: calling Integer method on Boolean
+        var result : boolVar.Plus(Integer(5))
+        
+        // Invalid constructor: wrong parameter type
+        var newInt : Integer(boolVar)
+        
+        // Invalid array access: using Boolean as index
+        var arr : Array[Integer](10)
+        var value : arr.get(boolVar)
+    end
+    
+    method invalidReturn : Integer is
+        // Returning wrong type (Boolean instead of Integer)
+        return boolVar
+    end
+    
+    method typeMismatchParam(p: Integer) : Boolean is
+        // Wrong return type
+        return p
+    end
+end

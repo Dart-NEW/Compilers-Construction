@@ -1,0 +1,101 @@
+class NumberProcessor is
+    var value : Integer(0)
+    
+    this(initialValue: Integer) is
+        value := initialValue
+    end
+    
+    method add(n: Integer) : NumberProcessor is
+        value := value.Plus(n)
+        return this
+    end
+    
+    method multiply(n: Integer) : NumberProcessor is
+        value := value.Mult(n)
+        return this
+    end
+    
+    method subtract(n: Integer) : NumberProcessor is
+        value := value.Minus(n)
+        return this
+    end
+    
+    method divide(n: Integer) : NumberProcessor is
+        value := value.Div(n)
+        return this
+    end
+    
+    method getValue : Integer is
+        return value
+    end
+end
+
+class StringProcessor is
+    var text : String("")
+    
+    this(initialText: String) is
+        text := initialText
+    end
+    
+    method append(s: String) : StringProcessor is
+        text := text.Plus(s)
+        return this
+    end
+    
+    method prepend(s: String) : StringProcessor is
+        text := s.Plus(text)
+        return this
+    end
+    
+    method getText : String is
+        return text
+    end
+end
+
+class Calculator is
+    var result : Real(0.0)
+    
+    this() is
+        result := Real(0.0)
+    end
+    
+    method setValue(v: Real) : Calculator is
+        result := v
+        return this
+    end
+    
+    method add(v: Real) : Calculator is
+        result := result.Plus(v)
+        return this
+    end
+    
+    method multiply(v: Real) : Calculator is
+        result := result.Mult(v)
+        return this
+    end
+    
+    method square : Calculator is
+        result := result.Mult(result)
+        return this
+    end
+    
+    method getResult : Real is
+        return result
+    end
+end
+
+class TestMethodChaining is
+    this() is
+        var processor : NumberProcessor(Integer(10))
+        var result1 : processor.add(Integer(5)).multiply(Integer(2)).subtract(Integer(3)).getValue()
+        
+        var stringProc : StringProcessor(String("Hello"))
+        var result2 : stringProc.append(String(" World")).prepend(String("Say: ")).getText()
+        
+        var calc : Calculator()
+        var result3 : calc.setValue(Real(5.0)).add(Real(3.0)).multiply(Real(2.0)).square().getResult()
+        
+        var complexChain : NumberProcessor(Integer(1))
+        var result4 : complexChain.add(Integer(2)).multiply(Integer(3)).add(Integer(4)).multiply(Integer(5)).getValue()
+    end
+end

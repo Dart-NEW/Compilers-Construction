@@ -1,0 +1,131 @@
+class Animal is
+    var name : String("")
+    var age : Integer(0)
+    
+    this(n: String, a: Integer) is
+        name := n
+        age := a
+    end
+    
+    method getName : String is
+        return name
+    end
+    
+    method getAge : Integer is
+        return age
+    end
+    
+    method makeSound : String is
+        return String("Generic animal sound")
+    end
+end
+
+class Mammal extends Animal is
+    var hasFur : Boolean(true)
+    
+    this(n: String, a: Integer, fur: Boolean) is
+        name := n
+        age := a
+        hasFur := fur
+    end
+    
+    method getHasFur : Boolean is
+        return hasFur
+    end
+    
+    method makeSound : String is
+        return String("Mammal sound")
+    end
+    
+    method giveBirth : String is
+        return String("Giving birth to live young")
+    end
+end
+
+class Carnivore extends Animal is
+    var teethCount : Integer(0)
+    
+    this(n: String, a: Integer, teeth: Integer) is
+        name := n
+        age := a
+        teethCount := teeth
+    end
+    
+    method getTeethCount : Integer is
+        return teethCount
+    end
+    
+    method makeSound : String is
+        return String("Carnivore growl")
+    end
+    
+    method hunt : String is
+        return String("Hunting for prey")
+    end
+end
+
+class Lion extends Mammal is
+    var maneLength : Real(0.0)
+    
+    this(n: String, a: Integer, fur: Boolean, mane: Real) is
+        name := n
+        age := a
+        hasFur := fur
+        maneLength := mane
+    end
+    
+    method getManeLength : Real is
+        return maneLength
+    end
+    
+    method makeSound : String is
+        return String("Roar!")
+    end
+    
+    method hunt : String is
+        return String("Hunting in the savanna")
+    end
+end
+
+class Tiger extends Carnivore is
+    var stripeCount : Integer(0)
+    
+    this(n: String, a: Integer, teeth: Integer, stripes: Integer) is
+        name := n
+        age := a
+        teethCount := teeth
+        stripeCount := stripes
+    end
+    
+    method getStripeCount : Integer is
+        return stripeCount
+    end
+    
+    method makeSound : String is
+        return String("Tiger roar!")
+    end
+    
+    method swim : String is
+        return String("Swimming in water")
+    end
+end
+
+class TestMultipleInheritance is
+    this() is
+        var lion : Lion(String("Simba"), Integer(5), Boolean(true), Real(15.5))
+        var tiger : Tiger(String("Rajah"), Integer(4), Integer(30), Integer(12))
+        
+        var lionSound : lion.makeSound()
+        var lionHunt : lion.hunt()
+        var lionBirth : lion.giveBirth()
+        var lionMane : lion.getManeLength()
+        
+        var tigerSound : tiger.makeSound()
+        var tigerHunt : tiger.hunt()
+        var tigerSwim : tiger.swim()
+        var tigerStripes : tiger.getStripeCount()
+        
+        var lionName : lion.getName()
+        var tigerAge : tiger.getAge()
+    end
+end

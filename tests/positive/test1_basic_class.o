@@ -1,0 +1,45 @@
+class Point is
+    var x : Integer(0)
+    var y : Integer(0)
+    
+    this() is
+        x := Integer(0)
+        y := Integer(0)
+    end
+    
+    this(px: Integer, py: Integer) is
+        x := px
+        y := py
+    end
+    
+    method getX : Integer is
+        return x
+    end
+    
+    method getY : Integer is
+        return y
+    end
+    
+    method setX(newX: Integer) is
+        x := newX
+    end
+    
+    method setY(newY: Integer) is
+        y := newY
+    end
+end
+
+class TestPoint is
+    this() is
+        var p1 : Point()
+        var p2 : Point(Integer(10), Integer(20))
+        
+        var x1 : p1.getX()
+        var y1 : p1.getY()
+        var x2 : p2.getX()
+        var y2 : p2.getY()
+        
+        p1.setX(Integer(5))
+        p1.setY(Integer(15))
+    end
+end

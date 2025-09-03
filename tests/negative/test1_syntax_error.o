@@ -1,0 +1,21 @@
+class SyntaxError is
+    var x : Integer(10)
+    var y : Integer(20)
+    
+    this() is
+        x := Integer(10)
+        y := Integer(20)
+        // Missing semicolon or incorrect syntax
+        x := y := Integer(30)  // This should cause a syntax error
+    end
+    
+    method invalidMethod is  // Missing return type specification
+        return x
+    end
+    
+    method anotherMethod : Integer is
+        // Missing 'is' keyword
+        return x.Plus(y)
+    end  // Missing 'end' keyword
+    
+    // Invalid class structure - missing 'end' for class

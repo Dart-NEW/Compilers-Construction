@@ -1,0 +1,60 @@
+class BooleanLogic is
+    var flag1 : Boolean(true)
+    var flag2 : Boolean(false)
+    var flag3 : Boolean(true)
+    
+    this() is
+        flag1 := Boolean(true)
+        flag2 := Boolean(false)
+        flag3 := Boolean(true)
+    end
+    
+    method testAnd : Boolean is
+        return flag1.And(flag2)
+    end
+    
+    method testOr : Boolean is
+        return flag1.Or(flag2)
+    end
+    
+    method testXor : Boolean is
+        return flag1.Xor(flag2)
+    end
+    
+    method testNot : Boolean is
+        return flag1.Not()
+    end
+    
+    method complexLogic : Boolean is
+        var temp1 : flag1.And(flag3)
+        var temp2 : flag2.Or(temp1)
+        var result : temp2.Xor(flag1.Not())
+        return result
+    end
+    
+    method comparisonLogic : Boolean is
+        var a : Integer(10)
+        var b : Integer(5)
+        var c : Integer(10)
+        
+        var equal : a.Equal(c)
+        var greater : a.Greater(b)
+        var less : b.Less(a)
+        
+        var result : equal.And(greater.Or(less))
+        return result
+    end
+end
+
+class TestBooleanOperations is
+    this() is
+        var logic : BooleanLogic()
+        
+        var andResult : logic.testAnd()
+        var orResult : logic.testOr()
+        var xorResult : logic.testXor()
+        var notResult : logic.testNot()
+        var complexResult : logic.complexLogic()
+        var comparisonResult : logic.comparisonLogic()
+    end
+end

@@ -1,0 +1,74 @@
+class ListManager is
+    var numbers : List[Integer]
+    var strings : List[String]
+    
+    this() is
+        numbers := List[Integer]()
+        strings := List[String]()
+        populateLists()
+    end
+    
+    method populateLists is
+        numbers := numbers.append(Integer(1))
+        numbers := numbers.append(Integer(2))
+        numbers := numbers.append(Integer(3))
+        numbers := numbers.append(Integer(4))
+        numbers := numbers.append(Integer(5))
+        
+        strings := strings.append(String("First"))
+        strings := strings.append(String("Second"))
+        strings := strings.append(String("Third"))
+    end
+    
+    method getFirstNumber : Integer is
+        return numbers.head()
+    end
+    
+    method getFirstString : String is
+        return strings.head()
+    end
+    
+    method getRestNumbers : List[Integer] is
+        return numbers.tail()
+    end
+    
+    method getRestStrings : List[String] is
+        return strings.tail()
+    end
+    
+    method addNumber(n: Integer) : List[Integer] is
+        return numbers.append(n)
+    end
+    
+    method addString(s: String) : List[String] is
+        return strings.append(s)
+    end
+    
+    method processList : Integer is
+        var sum : Integer(0)
+        var current : numbers
+        
+        while current.Length().Greater(Integer(0)) loop
+            sum := sum.Plus(current.head())
+            current := current.tail()
+        end
+        
+        return sum
+    end
+end
+
+class TestListOperations is
+    this() is
+        var manager : ListManager()
+        
+        var firstNum : manager.getFirstNumber()
+        var firstStr : manager.getFirstString()
+        var restNums : manager.getRestNumbers()
+        var restStrs : manager.getRestStrings()
+        
+        var newNumbers : manager.addNumber(Integer(10))
+        var newStrings : manager.addString(String("Fourth"))
+        
+        var totalSum : manager.processList()
+    end
+end

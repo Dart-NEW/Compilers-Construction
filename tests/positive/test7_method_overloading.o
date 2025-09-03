@@ -1,0 +1,47 @@
+class Calculator is
+    var result : Integer(0)
+    
+    this() is
+        result := Integer(0)
+    end
+    
+    method add(p: Integer) : Integer is
+        result := result.Plus(p)
+        return result
+    end
+    
+    method add(p: Real) : Real is
+        var realResult : result.toReal()
+        realResult := realResult.Plus(p)
+        return realResult
+    end
+    
+    method multiply(p: Integer) : Integer is
+        result := result.Mult(p)
+        return result
+    end
+    
+    method multiply(p: Real) : Real is
+        var realResult : result.toReal()
+        realResult := realResult.Mult(p)
+        return realResult
+    end
+    
+    method getResult : Integer is
+        return result
+    end
+end
+
+class TestMethodOverloading is
+    this() is
+        var calc : Calculator()
+        
+        var intResult : calc.add(Integer(10))
+        var realResult : calc.add(Real(3.14))
+        
+        var intMult : calc.multiply(Integer(2))
+        var realMult : calc.multiply(Real(1.5))
+        
+        var finalResult : calc.getResult()
+    end
+end

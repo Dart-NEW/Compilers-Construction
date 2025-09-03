@@ -1,0 +1,71 @@
+class TypeConverter is
+    var intValue : Integer(42)
+    var realValue : Real(3.14159)
+    var boolValue : Boolean(true)
+    
+    this() is
+        intValue := Integer(42)
+        realValue := Real(3.14159)
+        boolValue := Boolean(true)
+        performConversions()
+    end
+    
+    method performConversions is
+        var intToReal : intValue.toReal()
+        var realToInt : realValue.toInteger()
+        var intToBool : intValue.toBoolean()
+        var boolToInt : boolValue.toInteger()
+        
+        var convertedReal : intToReal.Plus(realValue)
+        var convertedInt : realToInt.Plus(intValue)
+        
+        var comparison1 : intToReal.Equal(realValue)
+        var comparison2 : realToInt.Equal(intValue)
+    end
+    
+    method explicitConversions : Real is
+        var a : Integer(10)
+        var b : Integer(3)
+        
+        var division : a.Div(b)
+        var realDivision : a.toReal().Div(b.toReal())
+        
+        var result : realDivision.Mult(Real(2.0))
+        return result
+    end
+    
+    method booleanConversions : Boolean is
+        var zero : Integer(0)
+        var one : Integer(1)
+        var negative : Integer(-1)
+        
+        var zeroBool : zero.toBoolean()
+        var oneBool : one.toBoolean()
+        var negativeBool : negative.toBoolean()
+        
+        var result : zeroBool.Or(oneBool.And(negativeBool.Not()))
+        return result
+    end
+    
+    method mixedArithmetic : Real is
+        var intVal : Integer(5)
+        var realVal : Real(2.5)
+        
+        var sum : intVal.Plus(realVal)
+        var product : intVal.Mult(realVal)
+        var difference : realVal.Minus(intVal)
+        
+        var result : sum.Plus(product).Minus(difference)
+        return result
+    end
+end
+
+class TestTypeConversions is
+    this() is
+        var converter : TypeConverter()
+        
+        var explicitResult : converter.explicitConversions()
+        var booleanResult : converter.booleanConversions()
+        var mixedResult : converter.mixedArithmetic()
+    end
+end

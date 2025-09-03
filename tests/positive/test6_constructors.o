@@ -1,0 +1,47 @@
+class Rectangle is
+    var width : Integer(0)
+    var height : Integer(0)
+    var area : Integer(0)
+    
+    this() is
+        width := Integer(1)
+        height := Integer(1)
+        area := width.Mult(height)
+    end
+    
+    this(w: Integer) is
+        width := w
+        height := w
+        area := width.Mult(height)
+    end
+    
+    this(w: Integer, h: Integer) is
+        width := w
+        height := h
+        area := width.Mult(height)
+    end
+    
+    method getWidth : Integer is
+        return width
+    end
+    
+    method getHeight : Integer is
+        return height
+    end
+    
+    method getArea : Integer is
+        return area
+    end
+end
+
+class TestConstructors is
+    this() is
+        var rect1 : Rectangle()
+        var rect2 : Rectangle(Integer(5))
+        var rect3 : Rectangle(Integer(10), Integer(8))
+        
+        var area1 : rect1.getArea()
+        var area2 : rect2.getArea()
+        var area3 : rect3.getArea()
+    end
+end

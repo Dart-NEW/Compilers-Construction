@@ -1,0 +1,50 @@
+class Animal is
+    var name : String("")
+    var age : Integer(0)
+    
+    this(n: String, a: Integer) is
+        name := n
+        age := a
+    end
+    
+    method getName : String is
+        return name
+    end
+    
+    method getAge : Integer is
+        return age
+    end
+    
+    method speak : String is
+        return String("Animal sound")
+    end
+end
+
+class Dog extends Animal is
+    var breed : String("")
+    
+    this(n: String, a: Integer, b: String) is
+        name := n
+        age := a
+        breed := b
+    end
+    
+    method getBreed : String is
+        return breed
+    end
+    
+    method speak : String is
+        return String("Woof!")
+    end
+end
+
+class TestInheritance is
+    this() is
+        var animal : Animal(String("Generic"), Integer(5))
+        var dog : Dog(String("Buddy"), Integer(3), String("Golden Retriever"))
+        
+        var animalSound : animal.speak()
+        var dogSound : dog.speak()
+        var dogBreed : dog.getBreed()
+    end
+end

@@ -1,0 +1,81 @@
+class ExpressionEvaluator is
+    var x : Integer(10)
+    var y : Integer(5)
+    var z : Real(2.5)
+    
+    this() is
+        x := Integer(10)
+        y := Integer(5)
+        z := Real(2.5)
+        evaluateComplexExpressions()
+    end
+    
+    method evaluateComplexExpressions is
+        var result1 : x.Plus(y).Mult(Integer(2)).Minus(Integer(3))
+        var result2 : x.Mult(y).Plus(z.toInteger()).Div(Integer(2))
+        var result3 : z.Mult(Real(2.0)).Plus(x.toReal()).Minus(y.toReal())
+        
+        var comparison : result1.Greater(result2.toInteger())
+        var logical : comparison.And(result3.Greater(Real(0.0)))
+    end
+    
+    method nestedMethodCalls : Integer is
+        var a : Integer(8)
+        var b : Integer(4)
+        var c : Integer(2)
+        
+        var result : a.Plus(b.Mult(c)).Div(Integer(2)).Mult(Integer(3))
+        return result
+    end
+    
+    method conditionalExpressions : Integer is
+        var a : Integer(15)
+        var b : Integer(10)
+        var c : Integer(5)
+        
+        var max : a.Greater(b).And(a.Greater(c)).toInteger().Mult(a)
+        var min : b.Less(a).And(b.Less(c)).toInteger().Mult(b)
+        
+        var result : max.Plus(min)
+        return result
+    end
+    
+    method arrayExpression : Integer is
+        var arr : Array[Integer](5)
+        var i : Integer(0)
+        
+        while i.Less(arr.Length()) loop
+            arr.set(i, i.Mult(i).Plus(Integer(1)))
+            i := i.Plus(Integer(1))
+        end
+        
+        var sum : Integer(0)
+        i := Integer(0)
+        while i.Less(arr.Length()) loop
+            sum := sum.Plus(arr.get(i).Mult(Integer(2)))
+            i := i.Plus(Integer(1))
+        end
+        
+        return sum
+    end
+    
+    method chainedOperations : Real is
+        var base : Real(10.0)
+        var multiplier : Real(1.5)
+        var divisor : Real(2.0)
+        
+        var result : base.Mult(multiplier).Div(divisor).Plus(Real(5.0)).Mult(Real(0.5))
+        return result
+    end
+end
+
+class TestComplexExpressions is
+    this() is
+        var evaluator : ExpressionEvaluator()
+        
+        var nestedResult : evaluator.nestedMethodCalls()
+        var conditionalResult : evaluator.conditionalExpressions()
+        var arrayResult : evaluator.arrayExpression()
+        var chainedResult : evaluator.chainedOperations()
+    end
+end

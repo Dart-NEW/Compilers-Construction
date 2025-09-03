@@ -1,0 +1,80 @@
+class ControlFlowDemo is
+    var counter : Integer(0)
+    var maxCount : Integer(10)
+    var threshold : Integer(5)
+    
+    this() is
+        counter := Integer(0)
+        maxCount := Integer(10)
+        threshold := Integer(5)
+        demonstrateControlFlow()
+    end
+    
+    method demonstrateControlFlow is
+        var i : Integer(0)
+        
+        while i.Less(maxCount) loop
+            if i.Less(threshold) then
+                counter := counter.Plus(Integer(1))
+            else
+                counter := counter.Plus(Integer(2))
+            end
+            
+            if i.Equal(Integer(3)) then
+                var temp : Integer(100)
+                counter := counter.Plus(temp)
+            end
+            
+            i := i.Plus(Integer(1))
+        end
+    end
+    
+    method nestedConditions : Integer is
+        var a : Integer(15)
+        var b : Integer(10)
+        var c : Integer(5)
+        var result : Integer(0)
+        
+        if a.Greater(b) then
+            if b.Greater(c) then
+                result := a.Plus(b).Plus(c)
+            else
+                result := a.Minus(b)
+            end
+        else
+            if a.Less(c) then
+                result := c.Minus(a)
+            else
+                result := b.Mult(Integer(2))
+            end
+        end
+        
+        return result
+    end
+    
+    method loopWithBreak : Integer is
+        var sum : Integer(0)
+        var i : Integer(0)
+        
+        while i.Less(Integer(20)) loop
+            sum := sum.Plus(i)
+            
+            if sum.Greater(Integer(50)) then
+                return sum
+            end
+            
+            i := i.Plus(Integer(1))
+        end
+        
+        return sum
+    end
+end
+
+class TestControlFlow is
+    this() is
+        var demo : ControlFlowDemo()
+        
+        var nestedResult : demo.nestedConditions()
+        var loopResult : demo.loopWithBreak()
+    end
+end
