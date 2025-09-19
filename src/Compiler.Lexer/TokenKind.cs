@@ -7,6 +7,8 @@ public enum TokenKind
     // Identifiers and literals
     Identifier,
     StringLiteral,
+    IntegerLiteral,
+    RealLiteral,
 
     // Keywords
     Class,
@@ -25,6 +27,7 @@ public enum TokenKind
 
     // Operators and punctuation
     Assign,      // :=
+    Arrow,       // =>
     Colon,       // :
     Comma,       // ,
     Dot,         // .

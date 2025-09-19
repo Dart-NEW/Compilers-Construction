@@ -70,6 +70,12 @@ public sealed class Lexer
                     else
                         yield return AdvanceMake(TokenKind.Colon, ":");
                     break;
+                case '=':
+                    if (MatchNext('>'))
+                        yield return AdvanceMake(TokenKind.Arrow, "=>");
+                    else
+                        yield return AdvanceMake(TokenKind.Identifier, "=");
+                    break;
                 case ',':
                     yield return AdvanceMake(TokenKind.Comma, ",");
                     break;
