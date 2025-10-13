@@ -44,6 +44,12 @@ public sealed class Lexer
 
             char ch = Peek();
 
+            if (char.IsDigit(ch))
+            {
+                yield return LexNumber();
+                continue;
+            }
+
             if (IsIdentifierStart(ch))
             {
                 yield return LexIdentifierOrKeyword();
@@ -130,6 +136,33 @@ public sealed class Lexer
         if (s_keywords.TryGetValue(text, out var kind))
             return new Token(kind, text, new SourceSpan(start, _position - start));
 
+        return new Token(TokenKind.Identifier, text, new SourceSpan(start, _position - start));
+    }
+
+    private Token LexNumber()
+    {
+        int start = _position;
+        var sb = new StringBuilder();
+        
+        while (!IsAtEnd() && char.IsDigit(Peek()))
+        {
+            sb.Append(Peek());
+            _position++;
+        }
+        
+        // Handle decimal point
+        if (!IsAtEnd() && Peek() == '.' && _position + 1 < _text.Length && char.IsDigit(_text[_position + 1]))
+        {
+            sb.Append(Peek());
+            _position++;
+            while (!IsAtEnd() && char.IsDigit(Peek()))
+            {
+                sb.Append(Peek());
+                _position++;
+            }
+        }
+        
+        string text = sb.ToString();
         return new Token(TokenKind.Identifier, text, new SourceSpan(start, _position - start));
     }
 
