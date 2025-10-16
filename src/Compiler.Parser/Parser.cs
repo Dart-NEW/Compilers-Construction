@@ -48,9 +48,14 @@ public sealed class Parser
                 members.Add(ParseMethod());
             else if (Check(TokenKind.This))
                 members.Add(ParseConstructor());
+            else if (Check(TokenKind.Class))
+                throw new ParseException($"Unexpected 'class' keyword - missing 'end' for class '{name}' or previous method");
             else
-                Advance();
+                throw new ParseException($"Unexpected token in class body: {Current().Kind} at position {_position} ('{Current().Lexeme}')");
         }
+        
+        if (IsAtEnd())
+            throw new ParseException($"Expected 'end' to close class '{name}', but reached end of file");
         
         Consume(TokenKind.End);
         return new ClassNode(name, parent, members);
@@ -165,8 +170,12 @@ public sealed class Parser
             Consume(TokenKind.Is);
             while (!Check(TokenKind.End) && !IsAtEnd())
             {
+                if (Check(TokenKind.Class) || Check(TokenKind.Method) || Check(TokenKind.This))
+                    throw new ParseException($"Missing 'end' for method '{name}' - found '{Current().Lexeme}'");
                 body.Add(ParseStatement());
             }
+            if (IsAtEnd())
+                throw new ParseException($"Expected 'end' to close method '{name}', but reached end of file");
             Consume(TokenKind.End);
         }
         return new MethodNode(name, parameters, returnType, body);
