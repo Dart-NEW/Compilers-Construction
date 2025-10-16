@@ -153,15 +153,22 @@ public sealed class Parser
             }
         }
         
-        Consume(TokenKind.Is);
-        
         var body = new List<StatementNode>();
-        while (!Check(TokenKind.End) && !IsAtEnd())
-        {
-            body.Add(ParseStatement());
-        }
         
-        Consume(TokenKind.End);
+        if (Match(TokenKind.Arrow)) // =>
+        {
+            var expr = ParseExpression();
+            body.Add(new ReturnNode(expr));
+        }
+        else
+        {
+            Consume(TokenKind.Is);
+            while (!Check(TokenKind.End) && !IsAtEnd())
+            {
+                body.Add(ParseStatement());
+            }
+            Consume(TokenKind.End);
+        }
         return new MethodNode(name, parameters, returnType, body);
     }
 
