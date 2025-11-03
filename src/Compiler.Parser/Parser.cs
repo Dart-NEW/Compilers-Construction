@@ -66,9 +66,57 @@ public sealed class Parser
         Consume(TokenKind.Var);
         var name = Consume(TokenKind.Identifier).Lexeme;
         Consume(TokenKind.Colon);
-        var initializer = ParseExpression();
-        
-        return new VariableNode(name, "", initializer);
+        // Support either a type annotation or an initializer expression
+        string type = "";
+        ExpressionNode? initializer = null;
+
+        if (Check(TokenKind.Identifier))
+        {
+            // Lookahead without consuming to decide: type vs expression
+            var nextNextKind = (_position + 1) < _tokens.Count ? _tokens[_position + 1].Kind : TokenKind.EndOfFile;
+            bool parseAsExpression = false;
+            if (nextNextKind == TokenKind.LParen || nextNextKind == TokenKind.Dot)
+            {
+                parseAsExpression = true;
+            }
+            else if (nextNextKind == TokenKind.LBracket)
+            {
+                // Find token after matching ']'
+                int i = _position + 2;
+                int depth = 1;
+                while (i < _tokens.Count && depth > 0)
+                {
+                    if (_tokens[i].Kind == TokenKind.LBracket) depth++;
+                    else if (_tokens[i].Kind == TokenKind.RBracket) depth--;
+                    i++;
+                }
+                var afterGeneric = i < _tokens.Count ? _tokens[i].Kind : TokenKind.EndOfFile;
+                if (afterGeneric == TokenKind.LParen) parseAsExpression = true;
+            }
+
+            if (parseAsExpression)
+            {
+                initializer = ParseExpression();
+            }
+            else
+            {
+                type = Consume(TokenKind.Identifier).Lexeme;
+                if (Match(TokenKind.LBracket))
+                {
+                    type += "[";
+                    while (!Check(TokenKind.RBracket) && !IsAtEnd())
+                        type += Advance().Lexeme;
+                    if (Check(TokenKind.RBracket)) type += Advance().Lexeme;
+                }
+            }
+        }
+        else
+        {
+            // Not an identifier, must be an expression initializer
+            initializer = ParseExpression();
+        }
+
+        return new VariableNode(name, type, initializer);
     }
 
     private ConstructorNode ParseConstructor()
@@ -188,8 +236,52 @@ public sealed class Parser
             Consume(TokenKind.Var);
             var name = Consume(TokenKind.Identifier).Lexeme;
             Consume(TokenKind.Colon);
-            var initializer = ParseExpression();
-            return new VariableStatementNode(name, "", initializer);
+            // Same dual-form as class fields
+            string type = "";
+            ExpressionNode? initializer = null;
+            if (Check(TokenKind.Identifier))
+            {
+                var nextNextKind = (_position + 1) < _tokens.Count ? _tokens[_position + 1].Kind : TokenKind.EndOfFile;
+                bool parseAsExpression = false;
+                if (nextNextKind == TokenKind.LParen || nextNextKind == TokenKind.Dot)
+                {
+                    parseAsExpression = true;
+                }
+                else if (nextNextKind == TokenKind.LBracket)
+                {
+                    int i = _position + 2;
+                    int depth = 1;
+                    while (i < _tokens.Count && depth > 0)
+                    {
+                        if (_tokens[i].Kind == TokenKind.LBracket) depth++;
+                        else if (_tokens[i].Kind == TokenKind.RBracket) depth--;
+                        i++;
+                    }
+                    var afterGeneric = i < _tokens.Count ? _tokens[i].Kind : TokenKind.EndOfFile;
+                    if (afterGeneric == TokenKind.LParen) parseAsExpression = true;
+                }
+
+                if (parseAsExpression)
+                {
+                    initializer = ParseExpression();
+                }
+                else
+                {
+                    type = Consume(TokenKind.Identifier).Lexeme;
+                    if (Match(TokenKind.LBracket))
+                    {
+                        type += "[";
+                        while (!Check(TokenKind.RBracket) && !IsAtEnd())
+                            type += Advance().Lexeme;
+                        if (Check(TokenKind.RBracket)) type += Advance().Lexeme;
+                    }
+                }
+            }
+            else
+            {
+                initializer = ParseExpression();
+            }
+            return new VariableStatementNode(name, type, initializer);
         }
         
         if (Check(TokenKind.If))
@@ -356,15 +448,35 @@ public sealed class Parser
         if (Match(TokenKind.This))
             return new ThisNode();
         
+        if (Check(TokenKind.IntegerLiteral))
+        {
+            var value = Advance().Lexeme;
+            return new IntegerLiteralNode(value);
+        }
+        
+        if (Check(TokenKind.RealLiteral))
+        {
+            var value = Advance().Lexeme;
+            return new RealLiteralNode(value);
+        }
+        
         if (Check(TokenKind.Identifier))
         {
             var name = Advance().Lexeme;
             
-            // Handle negative numbers like -1
-            if (name == "-" && Check(TokenKind.Identifier))
+            // Handle negative numeric literals like -1 or -3.14
+            if (name == "-" && (Check(TokenKind.IntegerLiteral) || Check(TokenKind.RealLiteral)))
             {
-                var number = Advance().Lexeme;
-                return new IdentifierNode("-" + number);
+                if (Check(TokenKind.IntegerLiteral))
+                {
+                    var number = Advance().Lexeme;
+                    return new IntegerLiteralNode("-" + number);
+                }
+                else
+                {
+                    var number = Advance().Lexeme;
+                    return new RealLiteralNode("-" + number);
+                }
             }
             
             // Handle generic types like Array[Integer]
@@ -382,6 +494,12 @@ public sealed class Parser
         {
             var value = Advance().Lexeme;
             return new StringLiteralNode(value);
+        }
+        
+        if (Check(TokenKind.BooleanLiteral))
+        {
+            var value = Advance().Lexeme;
+            return new BooleanLiteralNode(value);
         }
         
         if (Match(TokenKind.LParen))

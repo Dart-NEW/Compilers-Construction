@@ -23,6 +23,8 @@ public sealed class Lexer
         ["if"] = TokenKind.If,
         ["then"] = TokenKind.Then,
         ["else"] = TokenKind.Else,
+        ["true"] = TokenKind.BooleanLiteral,
+        ["false"] = TokenKind.BooleanLiteral,
     };
 
     public Lexer(string text)
@@ -157,10 +159,12 @@ public sealed class Lexer
         }
         
         // Handle decimal point
+        bool isReal = false;
         if (!IsAtEnd() && Peek() == '.' && _position + 1 < _text.Length && char.IsDigit(_text[_position + 1]))
         {
             sb.Append(Peek());
             _position++;
+            isReal = true;
             while (!IsAtEnd() && char.IsDigit(Peek()))
             {
                 sb.Append(Peek());
@@ -169,7 +173,7 @@ public sealed class Lexer
         }
         
         string text = sb.ToString();
-        return new Token(TokenKind.Identifier, text, new SourceSpan(start, _position - start));
+        return new Token(isReal ? TokenKind.RealLiteral : TokenKind.IntegerLiteral, text, new SourceSpan(start, _position - start));
     }
 
     private Token LexString()

@@ -9,6 +9,7 @@ public enum TokenKind
     StringLiteral,
     IntegerLiteral,
     RealLiteral,
+    BooleanLiteral,
 
     // Keywords
     Class,
