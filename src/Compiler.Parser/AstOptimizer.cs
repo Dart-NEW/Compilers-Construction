@@ -52,9 +52,16 @@ public sealed class AstOptimizer
         foreach (var s in statements)
         {
             foreach (var os in OptimizeStatement(s))
+            {
                 result.Add(os);
+                if (os is ReturnNode)
+                {
+                    // Remove code after return within the same block
+                    return RemoveUnusedVariables(result);
+                }
+            }
         }
-        return result;
+        return RemoveUnusedVariables(result);
     }
 
     private IEnumerable<StatementNode> OptimizeStatement(StatementNode stmt)
@@ -127,6 +134,132 @@ public sealed class AstOptimizer
                 return new IndexAccessNode(OptimizeExpression(ia.Target), OptimizeExpression(ia.Index));
             default:
                 return expr;
+        }
+    }
+
+    private List<StatementNode> RemoveUnusedVariables(List<StatementNode> statements)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        var kept = new List<StatementNode>(statements.Count);
+
+        // Backward pass for simple liveness on variable declarations
+        for (int i = statements.Count - 1; i >= 0; i--)
+        {
+            var s = statements[i];
+            switch (s)
+            {
+                case VariableStatementNode v:
+                {
+                    // If variable is never used later and has no initializer, drop it
+                    if (!used.Contains(v.Name) && v.Initializer is null)
+                    {
+                        // skip
+                        continue;
+                    }
+                    // Keep declaration; collect uses from initializer (if any)
+                    if (v.Initializer is not null)
+                        CollectReadIdentifiers(v.Initializer, used);
+                    kept.Add(v);
+                    // Definition could kill previous uses; no need to modify 'used' set here
+                    break;
+                }
+                case IfNode iNode:
+                {
+                    // Collect uses from condition and bodies
+                    CollectReadIdentifiers(iNode.Condition, used);
+                    foreach (var st in iNode.ThenBody) CollectReadsFromStatement(st, used);
+                    if (iNode.ElseBody is not null)
+                        foreach (var st in iNode.ElseBody) CollectReadsFromStatement(st, used);
+                    kept.Add(iNode);
+                    break;
+                }
+                case WhileNode wNode:
+                {
+                    CollectReadIdentifiers(wNode.Condition, used);
+                    foreach (var st in wNode.Body) CollectReadsFromStatement(st, used);
+                    kept.Add(wNode);
+                    break;
+                }
+                case ReturnNode r:
+                {
+                    CollectReadIdentifiers(r.Expression, used);
+                    kept.Add(r);
+                    break;
+                }
+                case ExpressionStatementNode e:
+                {
+                    CollectReadIdentifiers(e.Expression, used);
+                    kept.Add(e);
+                    break;
+                }
+                default:
+                    kept.Add(s);
+                    break;
+            }
+        }
+
+        kept.Reverse();
+        return kept;
+    }
+
+    private static void CollectReadsFromStatement(StatementNode stmt, HashSet<string> used)
+    {
+        switch (stmt)
+        {
+            case VariableStatementNode v:
+                if (v.Initializer is not null) CollectReadIdentifiers(v.Initializer, used);
+                break;
+            case IfNode i:
+                CollectReadIdentifiers(i.Condition, used);
+                foreach (var st in i.ThenBody) CollectReadsFromStatement(st, used);
+                if (i.ElseBody is not null)
+                    foreach (var st in i.ElseBody) CollectReadsFromStatement(st, used);
+                break;
+            case WhileNode w:
+                CollectReadIdentifiers(w.Condition, used);
+                foreach (var st in w.Body) CollectReadsFromStatement(st, used);
+                break;
+            case ReturnNode r:
+                CollectReadIdentifiers(r.Expression, used);
+                break;
+            case ExpressionStatementNode e:
+                CollectReadIdentifiers(e.Expression, used);
+                break;
+        }
+    }
+
+    private static void CollectReadIdentifiers(ExpressionNode expr, HashSet<string> used, bool isAssignTarget = false)
+    {
+        switch (expr)
+        {
+            case IdentifierNode id:
+                if (!isAssignTarget)
+                    used.Add(id.Name);
+                break;
+            case AssignmentNode a:
+                CollectReadIdentifiers(a.Target, used, isAssignTarget: true);
+                CollectReadIdentifiers(a.Value, used, isAssignTarget: false);
+                break;
+            case CallNode c:
+                CollectReadIdentifiers(c.Target, used);
+                foreach (var a in c.Arguments) CollectReadIdentifiers(a, used);
+                break;
+            case MemberAccessNode m:
+                CollectReadIdentifiers(m.Target, used);
+                if (m.Member is CallNode mc)
+                {
+                    CollectReadIdentifiers(mc, used);
+                }
+                // If Member is IdentifierNode, it's a member name, not a variable read
+                break;
+            case IndexAccessNode ia:
+                CollectReadIdentifiers(ia.Target, used);
+                CollectReadIdentifiers(ia.Index, used);
+                break;
+            case ConstructorCallNode cc:
+                foreach (var a in cc.Arguments) CollectReadIdentifiers(a, used);
+                break;
+            // Literals and ThisNode have no variable reads
         }
     }
 }

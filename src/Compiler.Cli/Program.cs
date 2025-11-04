@@ -7,7 +7,7 @@ static class Program
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("usage: compiler-cli [--lex|--parse|--analyze] <source-file>");
+            Console.Error.WriteLine("usage: compiler-cli [--lex|--parse|--analyze|--optimize] <source-file>");
             return 1;
         }
 
