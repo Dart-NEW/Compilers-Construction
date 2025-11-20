@@ -1,0 +1,14 @@
+class Hello is
+    var x : Integer
+    method double(x : Integer, y : Integer) : Integer => x.Plus(x)
+end
+
+class Hi extends Hello is
+    method getX() is
+        var i : Integer(0)
+        while i.Less(Integer(5)) loop
+            i := i.Plus(Integer(1))
+        end
+        return this.x
+    end
+end

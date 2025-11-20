@@ -7,7 +7,7 @@ static class Program
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("usage: compiler-cli [--lex|--parse|--analyze|--optimize] <source-file>");
+            Console.Error.WriteLine("usage: compiler-cli [--lex|--parse|--analyze|--optimize|--compile] <args>");
             return 1;
         }
 
@@ -93,6 +93,49 @@ static class Program
                 {
                     Console.Error.WriteLine($"Error: {ex.Message}");
                     return 2;
+                }
+            }
+
+            case "--compile":
+            {
+                if (args.Length < 3)
+                {
+                    Console.Error.WriteLine("usage: compiler-cli --compile <source-file> <output-exe> [ilasm-path]");
+                    return 1;
+                }
+
+                var outputPath = args[2];
+                var ilasmPath = args.Length > 3 ? args[3] : null;
+
+                try
+                {
+                    var parser = new Parser(tokens);
+                    var program = parser.Parse();
+
+                    var analyzer = new SemanticAnalyzer();
+                    analyzer.Analyze(program);
+                    if (analyzer.Diagnostics.Count > 0)
+                    {
+                        foreach (var diagnostic in analyzer.Diagnostics)
+                            Console.Error.WriteLine($"error: {diagnostic.Message}");
+                        return 3;
+                    }
+
+                    var optimizer = new AstOptimizer();
+                    var optimized = optimizer.Optimize(program);
+
+                    var compiler = new IlCompiler();
+                    var options = new IlCompilationOptions(
+                        outputPath: outputPath,
+                        ilasmPath: ilasmPath);
+                    compiler.Compile(optimized, options);
+                    Console.WriteLine($"Wrote executable to {options.OutputPath}");
+                    return 0;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Compilation failed: {ex.Message}");
+                    return 4;
                 }
             }
 
@@ -249,7 +292,7 @@ static class Program
 	}
 
             default:
-                Console.Error.WriteLine("Unknown mode. Use --lex, --parse, --analyze, or --optimize.");
+                Console.Error.WriteLine("Unknown mode. Use --lex, --parse, --analyze, --optimize, or --compile.");
                 return 1;
         }
     }

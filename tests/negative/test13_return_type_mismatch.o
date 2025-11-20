@@ -1,0 +1,7 @@
+class A is
+    method m : String is
+        return Integer(0)
+    end
+end
+
+

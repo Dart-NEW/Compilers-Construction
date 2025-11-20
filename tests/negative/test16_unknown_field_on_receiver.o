@@ -1,0 +1,13 @@
+class A is
+    var f : Integer
+end
+
+class B is
+    method m is
+        var a : A
+        a := A()
+        var x : a.noSuchField
+    end
+end
+
+

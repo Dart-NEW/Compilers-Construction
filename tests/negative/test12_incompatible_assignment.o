@@ -1,0 +1,11 @@
+class B is
+end
+
+class A is
+    method m is
+        var a : Integer
+        a := B()
+    end
+end
+
+

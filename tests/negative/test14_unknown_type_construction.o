@@ -1,0 +1,7 @@
+class A is
+    method m is
+        var x : Unknown(1)
+    end
+end
+
+

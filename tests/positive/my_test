@@ -1,0 +1,9 @@
+class A is
+    method m is
+        if true then
+            var x : Integer(1)
+        else
+            var y : Integer(2)
+        end
+    end
+end

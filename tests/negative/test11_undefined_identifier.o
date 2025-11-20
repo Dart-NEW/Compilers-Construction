@@ -1,0 +1,8 @@
+class A is
+    method m is
+        var y : Integer
+        y := x
+    end
+end
+
+

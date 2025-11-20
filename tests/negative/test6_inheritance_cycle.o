@@ -1,0 +1,8 @@
+class A extends B is
+end
+
+class B extends С is
+end
+
+class С extends A is
+end

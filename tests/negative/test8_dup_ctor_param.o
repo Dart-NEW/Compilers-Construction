@@ -1,0 +1,6 @@
+class A is
+    this(x: Integer, x: Integer) is
+    end
+end
+
+

@@ -1,0 +1,16 @@
+class A is
+    method noSuchMethod is
+        var a : Integer
+    end
+end
+
+class B is
+    method m is
+        var a : C
+        a := C()
+        var x : a.noSuchMethod()
+    end
+end
+
+class C extends A is
+end
