@@ -380,9 +380,6 @@ public sealed class SemanticAnalyzer
 
     private static MethodNode? FindMethod(ClassSymbol cls, string name, int arity)
     {
-        // Built-in methods for primitive types
-        if (name == "Print" && arity == 0)
-            return new MethodNode("Print", new List<ParameterNode>(), "", new List<StatementNode>());
         
         for (var c = cls; c is not null; c = c.BaseClass)
         {
