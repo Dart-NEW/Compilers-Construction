@@ -57,29 +57,12 @@ public sealed class IlCompiler
         var generator = new IlGenerator(options);
         var ilText = generator.Generate(program);
 
-        var tempIlPath = Path.Combine(Path.GetTempPath(), $"{options.AssemblyName}_{Guid.NewGuid():N}.il");
-        // Write without BOM to avoid ilasm parsing issues
+        var ilPath = Path.ChangeExtension(options.OutputPath, ".il");
         var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-        File.WriteAllText(tempIlPath, ilText, utf8NoBom);
+        File.WriteAllText(ilPath, ilText, utf8NoBom);
+        Console.WriteLine($"IL file saved at: {ilPath}");
 
-        try
-        {
-            RunIlasm(tempIlPath, options);
-        }
-        catch
-        {
-            // Keep IL file on error for debugging
-            Console.Error.WriteLine($"IL file kept at: {tempIlPath}");
-            throw;
-        }
-        finally
-        {
-            // Only delete on success
-            if (File.Exists(tempIlPath) && File.Exists(options.OutputPath))
-            {
-                try { File.Delete(tempIlPath); } catch { /* ignore */ }
-            }
-        }
+        RunIlasm(ilPath, options);
 
         return options.OutputPath;
     }
@@ -210,7 +193,7 @@ internal sealed class IlGenerator
         foreach (var cls in _classes.Values)
             cls.ResolveBase(_classes);
 
-        var entry = ResolveEntryPoint(program);
+        var entry = ((string, string)?)null;
         var defaultEntryClass = entry is null ? FindDefaultEntryClass(program) : null;
 
         var sb = new StringBuilder();
@@ -218,7 +201,7 @@ internal sealed class IlGenerator
         foreach (var cls in program.Classes)
         {
             var model = _classes[cls.Name];
-            EmitClass(sb, model, entry);
+            EmitClass(sb, model, null);
         }
         
         // Always generate a Main class with static Main method that reads args
@@ -274,6 +257,10 @@ internal sealed class IlGenerator
     private void EmitRuntimeEntryPoint(StringBuilder sb, ProgramNode program)
     {
         var exitLabel = NewLabel("EXIT");
+        var argErrorLabel = "IL_ARG_ERROR";
+        
+        // Найти класс Main
+        var mainClass = program.Classes.FirstOrDefault(c => c.Name == "Main");
         
         sb.AppendLine($".class public auto ansi beforefieldinit {_options.Namespace}.Program");
         sb.AppendLine("         extends [mscorlib]System.Object");
@@ -282,43 +269,115 @@ internal sealed class IlGenerator
         sb.AppendLine("  {");
         sb.AppendLine("    .entrypoint");
         sb.AppendLine("    .maxstack 16");
-        sb.AppendLine("    .locals init (string V_0, int32 V_1)");
+        sb.AppendLine("    .locals init (string V_0)");
         
-        // Check if args is null or empty
+        // Если args пустой
         sb.AppendLine("    ldarg.0");
-        sb.AppendLine($"    brfalse {exitLabel}");
+        sb.AppendLine("    brfalse IL_NO_ARGS");
         sb.AppendLine("    ldarg.0");
         sb.AppendLine("    ldlen");
         sb.AppendLine("    conv.i4");
         sb.AppendLine("    ldc.i4.0");
-        sb.AppendLine($"    ble {exitLabel}");
+        sb.AppendLine("    ble IL_NO_ARGS");
         
-        // Get class name from args[0]
         sb.AppendLine("    ldarg.0");
         sb.AppendLine("    ldc.i4.0");
         sb.AppendLine("    ldelem.ref");
         sb.AppendLine("    stloc V_0");
         
-        // Get argument count (args.Length - 1, since args[0] is class name)
-        sb.AppendLine("    ldarg.0");
-        sb.AppendLine("    ldlen");
-        sb.AppendLine("    conv.i4");
-        sb.AppendLine("    ldc.i4.1");
-        sb.AppendLine("    sub");
-        sb.AppendLine("    stloc V_1");
-        
-        // Generate switch/if-else for each class
         foreach (var cls in program.Classes)
         {
-            EmitClassConstructorDispatch(sb, cls);
+            var className = cls.Name;
+            var qualifiedName = $"{_options.Namespace}.{className}";
+            var checkLabel = $"IL_{className}_CHECK";
+            var doneLabel = $"IL_{className}_DONE";
+            
+            sb.AppendLine($"  {checkLabel}:");
+            sb.AppendLine("    ldloc V_0");
+            sb.AppendLine($"    ldstr \"{className}\"");
+            sb.AppendLine("    call bool [mscorlib]System.String::op_Equality(string, string)");
+            sb.AppendLine($"    brfalse.s {doneLabel}");
+            
+            var constructors = cls.Members.OfType<ConstructorNode>().ToList();
+            var ctor = constructors.Count > 0 ? constructors[0] : null;
+            var paramCount = ctor?.Parameters.Count ?? 0;
+            
+            sb.AppendLine("    ldarg.0");
+            sb.AppendLine("    ldlen");
+            sb.AppendLine("    conv.i4");
+            sb.AppendLine($"    ldc.i4 {paramCount + 1}");
+            sb.AppendLine($"    bne.un.s {argErrorLabel}");
+            
+            for (int i = 0; i < paramCount; i++)
+            {
+                sb.AppendLine("    ldarg.0");
+                sb.AppendLine($"    ldc.i4 {i + 1}");
+                sb.AppendLine("    ldelem.ref");
+                
+                var paramType = ctor!.Parameters[i].Type;
+                if (paramType == "Integer")
+                    sb.AppendLine("    call int32 [mscorlib]System.Int32::Parse(string)");
+                else if (paramType == "Real")
+                    sb.AppendLine("    call float64 [mscorlib]System.Double::Parse(string)");
+                else if (paramType == "Boolean")
+                    sb.AppendLine("    call bool [mscorlib]System.Boolean::Parse(string)");
+            }
+            
+            var paramTypes = paramCount == 0 ? "" : string.Join(", ", ctor!.Parameters.Select(p => 
+                p.Type switch
+                {
+                    "Integer" => "int32",
+                    "Real" => "float64",
+                    "Boolean" => "valuetype [mscorlib]System.Boolean",
+                    "String" => "string",
+                    _ => $"class {_options.Namespace}.{p.Type}"
+                }));
+            
+            sb.AppendLine($"    newobj instance void {qualifiedName}::.ctor({paramTypes})");
+            sb.AppendLine("    pop");
+            sb.AppendLine($"    br.s {exitLabel}");
+            
+            sb.AppendLine($"  {doneLabel}:");
         }
         
-        // Exit label
+        sb.AppendLine("  IL_NO_ARGS:");
+        if (mainClass != null)
+        {
+            var mainQualifiedName = $"{_options.Namespace}.Main";
+            var mainCtor = mainClass.Members.OfType<ConstructorNode>().FirstOrDefault();
+            var mainParamCount = mainCtor?.Parameters.Count ?? 0;
+            
+            if (mainParamCount == 0)
+            {
+                sb.AppendLine($"    newobj instance void {mainQualifiedName}::.ctor()");
+                sb.AppendLine("    pop");
+                sb.AppendLine($"    br.s {exitLabel}");
+            }
+            else
+            {
+                sb.AppendLine($"    ldstr \"Error: Class 'Main' requires {mainParamCount} arguments\"");
+                sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
+                sb.AppendLine("    ret");
+            }
+        }
+        else
+        {
+            sb.AppendLine("    ldstr \"Error: No class name specified and no 'Main' class found\"");
+            sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
+            sb.AppendLine("    ret");
+        }
+        
+        sb.AppendLine($"  {argErrorLabel}:");
+        sb.AppendLine("    ldstr \"Error: Invalid number of arguments\"");
+        sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
+        sb.AppendLine("    ret");
+        
         sb.AppendLine($"  {exitLabel}:");
         sb.AppendLine("    ret");
         sb.AppendLine("  }");
         sb.AppendLine("}");
     }
+
     
     private void EmitClassConstructorDispatch(StringBuilder sb, ClassNode cls)
     {
@@ -443,8 +502,9 @@ internal sealed class IlGenerator
         foreach (var field in cls.Fields.Values)
         {
             var fieldName = EscapeIlIdentifier(field.Name);
-            sb.AppendLine($"  .field private {field.Type.IlName} {fieldName}");
+            sb.AppendLine($"  .field public {field.Type.IlName} {fieldName}");
         }
+
 
         if (cls.Constructors.Count == 0)
         {
@@ -563,7 +623,7 @@ internal sealed class IlGenerator
         public static readonly TypeInfo Void = new("void", "void", true);
         public static readonly TypeInfo Int32 = new("Integer", "int32", true);
         public static readonly TypeInfo Float64 = new("Real", "float64", true);
-        public static readonly TypeInfo Boolean = new("Boolean", "valuetype [mscorlib]System.Boolean", true);
+        public static readonly TypeInfo Boolean = new("Boolean", "int32", true);
         public static readonly TypeInfo String = new("String", "string", false);
         public static readonly TypeInfo Object = new("Object", "class [mscorlib]System.Object", false);
     }
@@ -720,9 +780,35 @@ internal sealed class IlGenerator
         public void EmitConstructorBody(ConstructorNode? ctor)
         {
             EmitLoadThis();
-            var baseName = _class.BaseClass?.GetQualifiedName() ?? "[mscorlib]System.Object";
-            _sb.AppendLine($"      call instance void {baseName}::.ctor()");
+            
+            // Вызвать конструктор базового класса с параметрами
+            if (_class.BaseClass is not null)
+            {
+                var baseName = _class.BaseClass.GetQualifiedName();
+                var baseCtors = _class.BaseClass.Node.Members.OfType<ConstructorNode>().ToList();
+                
+                if (baseCtors.Count > 0)
+                {
+                    var baseCtor = baseCtors[0];
+                    // Передать первые N параметров базовому конструктору
+                    for (int i = 0; i < baseCtor.Parameters.Count && i < (ctor?.Parameters.Count ?? 0); i++)
+                    {
+                        EmitLoadArgument(i + 1);
+                    }
+                    var baseParamTypes = string.Join(", ", baseCtor.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
+                    _sb.AppendLine($"      call instance void {baseName}::.ctor({baseParamTypes})");
+                }
+                else
+                {
+                    _sb.AppendLine($"      call instance void {baseName}::.ctor()");
+                }
+            }
+            else
+            {
+                _sb.AppendLine("      call instance void [mscorlib]System.Object::.ctor()");
+            }
 
+            // Инициализировать поля
             foreach (var field in _class.Fields.Values)
             {
                 if (field.Node.Initializer is null) continue;
@@ -731,6 +817,7 @@ internal sealed class IlGenerator
                 _sb.AppendLine($"      stfld {field.Type.IlName} {_class.GetQualifiedName()}::{_owner.EscapeIlIdentifier(field.Name)}");
             }
 
+            // Выполнить тело конструктора
             if (ctor is not null)
             {
                 foreach (var statement in ctor.Body)
@@ -836,21 +923,68 @@ internal sealed class IlGenerator
                 ConstructorCallNode ctor => ctor.ClassName,
                 IdentifierNode id when _locals.TryGetValue(id.Name, out var local) => local.Type.SourceName,
                 IdentifierNode id when _parameters.TryGetValue(id.Name, out var parameter) => parameter.Type.SourceName,
-                MemberAccessNode member when member.Member is CallNode call && call.Target is IdentifierNode methodName =>
-                    InferMethodReturnType(member.Target, methodName.Name, call.Arguments.Count),
+                MemberAccessNode member => InferMemberAccessType(member),
                 _ => "Object"
             };
         }
-        
-        private string InferMethodReturnType(ExpressionNode receiver, string methodName, int argCount)
+
+        private string InferMemberAccessType(MemberAccessNode member)
         {
-            var receiverType = InferType(receiver);
-            if (_owner.TryResolveClass(receiverType, out var receiverClass))
+            if (member.Member is CallNode call && call.Target is IdentifierNode methodName)
             {
-                var method = receiverClass.FindMethod(methodName, argCount);
-                if (method is not null && !string.IsNullOrWhiteSpace(method.ReturnType))
-                    return method.ReturnType;
+                var receiverType = InferType(member.Target);
+                
+                if (receiverType == "Integer")
+                {
+                    if (methodName.Name is "Plus" or "Minus" or "Mult" or "Div")
+                    {
+                        if (call.Arguments.Count > 0)
+                        {
+                            var argType = InferType(call.Arguments[0]);
+                            if (argType == "Real")
+                                return "Real";
+                        }
+                        return "Integer";
+                    }
+                    return methodName.Name switch
+                    {
+                        "Rem" => "Integer",
+                        "Less" or "Greater" or "Equal" or "LessEqual" or "GreaterEqual" => "Boolean",
+                        "toReal" => "Real",
+                        "UnaryMinus" => "Integer",
+                        _ => "Object"
+                    };
+                }
+                
+                if (receiverType == "Real")
+                {
+                    return methodName.Name switch
+                    {
+                        "Plus" or "Minus" or "Mult" or "Div" => "Real",
+                        "Less" or "Greater" or "Equal" or "LessEqual" or "GreaterEqual" => "Boolean",
+                        "toInteger" => "Integer",
+                        "UnaryMinus" => "Real",
+                        _ => "Object"
+                    };
+                }
+                
+                if (receiverType == "Boolean")
+                {
+                    return methodName.Name switch
+                    {
+                        "And" or "Or" or "Xor" or "Not" => "Boolean",
+                        _ => "Object"
+                    };
+                }
+                
+                if (_owner.TryResolveClass(receiverType, out var receiverClass))
+                {
+                    var method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
+                    if (method is not null && !string.IsNullOrWhiteSpace(method.ReturnType))
+                        return method.ReturnType;
+                }
             }
+            
             return "Object";
         }
 
@@ -913,7 +1047,8 @@ internal sealed class IlGenerator
 
         private TypeInfo EmitStringLiteral(StringLiteralNode literal)
         {
-            _sb.AppendLine($"      ldstr \"{literal.Value}\"");
+            var escaped = literal.Value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            _sb.AppendLine($"      ldstr \"{escaped}\"");
             return TypeInfo.String;
         }
 
@@ -1005,26 +1140,180 @@ internal sealed class IlGenerator
 
         private TypeInfo EmitMemberAccess(MemberAccessNode member)
         {
-            if (member.Member is IdentifierNode fieldName)
-            {
-                var receiverTypeName = InferType(member.Target);
-                var receiverType = EmitExpression(member.Target);
-                if (_owner.TryResolveClass(receiverTypeName, out var receiverClass))
-                {
-                    var field = receiverClass.FindField(fieldName.Name);
-                    if (field is not null)
-                    {
-                        _sb.AppendLine($"      ldfld {field.Type.IlName} {receiverClass.GetQualifiedName()}::{_owner.EscapeIlIdentifier(field.Name)}");
-                        return field.Type;
-                    }
-                }
-                return receiverType;
-            }
-
             if (member.Member is CallNode call && call.Target is IdentifierNode methodName)
             {
+                // Handle built-in Print() method
+                if (methodName.Name == "Print" && call.Arguments.Count == 0)
+                {
+                    var receiverType = EmitExpression(member.Target);
+                    _sb.AppendLine($"      call void [mscorlib]System.Console::WriteLine({receiverType.IlName})");
+                    return TypeInfo.Void;
+                }
+                
                 var receiverTypeName = InferType(member.Target);
-                var receiverType = EmitExpression(member.Target);
+                
+                // Handle built-in Integer methods
+                if (receiverTypeName == "Integer")
+                {
+                    EmitExpression(member.Target);
+                    var argType = call.Arguments.Count > 0 ? InferType(call.Arguments[0]) : "";
+                    
+                    switch (methodName.Name)
+                    {
+                        case "Plus":
+                        case "Minus":
+                        case "Mult":
+                        case "Div":
+                            if (argType == "Real")
+                                _sb.AppendLine("      conv.r8");
+                            EmitExpression(call.Arguments[0]);
+                            _sb.AppendLine(methodName.Name switch
+                            {
+                                "Plus" => "      add",
+                                "Minus" => "      sub",
+                                "Mult" => "      mul",
+                                "Div" => "      div",
+                                _ => ""
+                            });
+                            return argType == "Real" ? TypeInfo.Float64 : TypeInfo.Int32;
+                            
+                        case "Rem":
+                            EmitExpression(call.Arguments[0]);
+                            _sb.AppendLine("      rem");
+                            return TypeInfo.Int32;
+                            
+                        case "Less":
+                        case "Greater":
+                        case "Equal":
+                        case "LessEqual":
+                        case "GreaterEqual":
+                            if (argType == "Real")
+                                _sb.AppendLine("      conv.r8");
+                            EmitExpression(call.Arguments[0]);
+                            if (methodName.Name == "Less")
+                                _sb.AppendLine("      clt");
+                            else if (methodName.Name == "Greater")
+                                _sb.AppendLine("      cgt");
+                            else if (methodName.Name == "Equal")
+                                _sb.AppendLine("      ceq");
+                            else if (methodName.Name == "LessEqual")
+                            {
+                                _sb.AppendLine("      cgt");
+                                _sb.AppendLine("      ldc.i4.0");
+                                _sb.AppendLine("      ceq");
+                            }
+                            else if (methodName.Name == "GreaterEqual")
+                            {
+                                _sb.AppendLine("      clt");
+                                _sb.AppendLine("      ldc.i4.0");
+                                _sb.AppendLine("      ceq");
+                            }
+                            return TypeInfo.Boolean;
+                            
+                        case "toReal":
+                            _sb.AppendLine("      conv.r8");
+                            return TypeInfo.Float64;
+                            
+                        case "UnaryMinus":
+                            _sb.AppendLine("      neg");
+                            return TypeInfo.Int32;
+                    }
+                }
+                
+                // Handle built-in Real methods
+                if (receiverTypeName == "Real")
+                {
+                    EmitExpression(member.Target);
+                    var argType = call.Arguments.Count > 0 ? InferType(call.Arguments[0]) : "";
+                    
+                    switch (methodName.Name)
+                    {
+                        case "Plus":
+                        case "Minus":
+                        case "Mult":
+                        case "Div":
+                            EmitExpression(call.Arguments[0]);
+                            if (argType == "Integer")
+                                _sb.AppendLine("      conv.r8");
+                            _sb.AppendLine(methodName.Name switch
+                            {
+                                "Plus" => "      add",
+                                "Minus" => "      sub",
+                                "Mult" => "      mul",
+                                "Div" => "      div",
+                                _ => ""
+                            });
+                            return TypeInfo.Float64;
+                            
+                        case "Less":
+                        case "Greater":
+                        case "Equal":
+                        case "LessEqual":
+                        case "GreaterEqual":
+                            EmitExpression(call.Arguments[0]);
+                            if (argType == "Integer")
+                                _sb.AppendLine("      conv.r8");
+                            if (methodName.Name == "Less")
+                                _sb.AppendLine("      clt");
+                            else if (methodName.Name == "Greater")
+                                _sb.AppendLine("      cgt");
+                            else if (methodName.Name == "Equal")
+                                _sb.AppendLine("      ceq");
+                            else if (methodName.Name == "LessEqual")
+                            {
+                                _sb.AppendLine("      cgt");
+                                _sb.AppendLine("      ldc.i4.0");
+                                _sb.AppendLine("      ceq");
+                            }
+                            else if (methodName.Name == "GreaterEqual")
+                            {
+                                _sb.AppendLine("      clt");
+                                _sb.AppendLine("      ldc.i4.0");
+                                _sb.AppendLine("      ceq");
+                            }
+                            return TypeInfo.Boolean;
+                            
+                        case "toInteger":
+                            _sb.AppendLine("      conv.i4");
+                            return TypeInfo.Int32;
+                            
+                        case "UnaryMinus":
+                            _sb.AppendLine("      neg");
+                            return TypeInfo.Float64;
+                    }
+                }
+                
+                // Handle built-in Boolean methods
+                if (receiverTypeName == "Boolean")
+                {
+                    EmitExpression(member.Target);
+                    
+                    switch (methodName.Name)
+                    {
+                        case "And":
+                            EmitExpression(call.Arguments[0]);
+                            _sb.AppendLine("      and");
+                            return TypeInfo.Boolean;
+                            
+                        case "Or":
+                            EmitExpression(call.Arguments[0]);
+                            _sb.AppendLine("      or");
+                            return TypeInfo.Boolean;
+                            
+                        case "Xor":
+                            EmitExpression(call.Arguments[0]);
+                            _sb.AppendLine("      xor");
+                            return TypeInfo.Boolean;
+                            
+                        case "Not":
+                            _sb.AppendLine("      ldc.i4.0");
+                            _sb.AppendLine("      ceq");
+                            return TypeInfo.Boolean;
+                    }
+                }
+                
+                // Existing code for user-defined classes
+                var receiverType2 = EmitExpression(member.Target);
                 if (_owner.TryResolveClass(receiverTypeName, out var receiverClass))
                 {
                     var method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
@@ -1040,63 +1329,78 @@ internal sealed class IlGenerator
                     _sb.AppendLine($"      callvirt instance {returnType.IlName} {receiverClass.GetQualifiedName()}::{escapedMethodName}({argumentSignature})");
                     return returnType;
                 }
-                return receiverType;
+                return receiverType2;
             }
-
-            return EmitExpression(member.Target);
+            else if (member.Member is IdentifierNode fieldName)
+            {
+                var receiverTypeName = InferType(member.Target);
+                if (IsPrimitive(receiverTypeName) || string.IsNullOrEmpty(receiverTypeName)) return TypeInfo.Object;
+                if (!_owner.TryResolveClass(receiverTypeName, out var receiverClass)) return TypeInfo.Object;
+                var fieldType = receiverClass.FindField(fieldName.Name);
+                if (fieldType is null)
+                    return TypeInfo.Object;
+                EmitExpression(member.Target);
+                _sb.AppendLine($"      ldfld {fieldType.Type.IlName} {receiverClass.GetQualifiedName()}::{_owner.EscapeIlIdentifier(fieldName.Name)}");
+                return fieldType.Type;
+            }
+            else
+            {
+                EmitExpression(member.Member);
+                return TypeInfo.Object;
+            }
         }
 
-        private TypeInfo EmitConstructorCall(ConstructorCallNode ctor)
+        private static bool IsPrimitive(string type)
+            => type is "String" or "Integer" or "Real" or "Boolean";
+
+
+
+        private TypeInfo EmitConstructorCall(ConstructorCallNode cc)
         {
-            if (string.Equals(ctor.ClassName, "Integer", StringComparison.Ordinal))
+            // Для примитивных типов
+            if (cc.ClassName == "Integer")
             {
-                if (ctor.Arguments.Count == 0)
-                {
-                    _sb.AppendLine("      ldc.i4 0");
-                }
-                else
-                {
-                    EmitExpression(ctor.Arguments[0]);
-                }
+                if (cc.Arguments.Count > 0)
+                    return EmitExpression(cc.Arguments[0]);
+                _sb.AppendLine("      ldc.i4 0");
                 return TypeInfo.Int32;
             }
-
-            if (string.Equals(ctor.ClassName, "Boolean", StringComparison.Ordinal))
+            if (cc.ClassName == "String")
             {
-                if (ctor.Arguments.Count == 0)
-                    _sb.AppendLine("      ldc.i4 0");
-                else
-                    EmitExpression(ctor.Arguments[0]);
+                if (cc.Arguments.Count > 0)
+                    return EmitExpression(cc.Arguments[0]);
+                _sb.AppendLine("      ldstr \"\"");
+                return TypeInfo.String;
+            }
+            if (cc.ClassName == "Real")
+            {
+                if (cc.Arguments.Count > 0)
+                    return EmitExpression(cc.Arguments[0]);
+                _sb.AppendLine("      ldc.r8 0.0");
+                return TypeInfo.Float64;
+            }
+            if (cc.ClassName == "Boolean")
+            {
+                if (cc.Arguments.Count > 0)
+                    return EmitExpression(cc.Arguments[0]);
+                _sb.AppendLine("      ldc.i4 0");
                 return TypeInfo.Boolean;
             }
-
-            // Check if it's actually a method call on 'this'
-            var method = _class.FindMethod(ctor.ClassName, ctor.Arguments.Count);
-            if (method is not null)
+            
+            // Для пользовательских классов
+            foreach (var arg in cc.Arguments)
+                EmitExpression(arg);
+            
+            if (_owner.TryResolveClass(cc.ClassName, out var cls))
             {
-                // It's a method call, not a constructor call
-                EmitLoadThis();
-                foreach (var argument in ctor.Arguments)
-                    EmitExpression(argument);
-                var returnType = string.IsNullOrWhiteSpace(method.ReturnType)
-                    ? TypeInfo.Void
-                    : _owner.ResolveType(method.ReturnType);
-                var argumentSignature = string.Join(", ", method.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
-                _sb.AppendLine($"      callvirt instance {returnType.IlName} {_class.GetQualifiedName()}::{ctor.ClassName}({argumentSignature})");
-                return returnType;
+                var ctor = cls.Constructors.FirstOrDefault(c => c.Parameters.Count == cc.Arguments.Count);
+                var paramTypes = ctor is null ? "" : string.Join(", ", ctor.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
+                var qualifiedName = cls.GetQualifiedName();
+                _sb.AppendLine($"      newobj instance void {qualifiedName}::.ctor({paramTypes})");
+                return new TypeInfo(cc.ClassName, $"class {qualifiedName}", false);
             }
-
-            if (!_owner.TryResolveClass(ctor.ClassName, out var cls))
-                return TypeInfo.Object;
-
-            var ctorMatch = cls.FindConstructor(ctor.Arguments.Count);
-            foreach (var argument in ctor.Arguments)
-                EmitExpression(argument);
-            var signature = ctorMatch is null
-                ? string.Empty
-                : string.Join(", ", ctorMatch.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
-            _sb.AppendLine($"      newobj instance void {cls.GetQualifiedName()}::.ctor({signature})");
-            return new TypeInfo(cls.Name, $"class {cls.GetQualifiedName()}", false);
+            
+            return TypeInfo.Object;
         }
 
         private TypeInfo EmitCall(CallNode call)

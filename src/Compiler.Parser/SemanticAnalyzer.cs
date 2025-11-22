@@ -197,7 +197,10 @@ public sealed class SemanticAnalyzer
         switch (stmt)
         {
             case VariableStatementNode v:
-                if (!scope.Declare(v.Name, v.Type))
+                var varType = !string.IsNullOrWhiteSpace(v.Type) 
+                    ? v.Type 
+                    : (v.Initializer is ConstructorCallNode cc ? cc.ClassName : "");
+                if (!scope.Declare(v.Name, varType))
                     Report($"Variable '{v.Name}' already defined in this scope.");
                 if (v.Initializer is not null)
                     AnalyzeExpression(v.Initializer, scope, cls);
@@ -291,6 +294,17 @@ public sealed class SemanticAnalyzer
                 var receiverType = AnalyzeExpression(ma.Target, scope, cls);
                 if (ma.Member is CallNode mc && mc.Target is IdentifierNode mname)
                 {
+                    // Проверка Print() - только для Integer, Real, Boolean, String
+                    if (mname.Name == "Print" && mc.Arguments.Count == 0)
+                    {
+                        if (!IsPrimitive(receiverType) && !string.IsNullOrEmpty(receiverType))
+                        {
+                            Report($"Method 'Print' is not defined for type '{receiverType}'.");
+                        }
+                        return "void";
+                    }
+
+                    
                     // Analyze arguments first
                     foreach (var a in mc.Arguments) AnalyzeExpression(a, scope, cls);
                     // Skip strict checking for primitives
@@ -377,6 +391,10 @@ public sealed class SemanticAnalyzer
 
     private static MethodNode? FindMethod(ClassSymbol cls, string name, int arity)
     {
+        // Built-in methods for primitive types
+        if (name == "Print" && arity == 0)
+            return new MethodNode("Print", new List<ParameterNode>(), "", new List<StatementNode>());
+        
         for (var c = cls; c is not null; c = c.BaseClass)
         {
             if (c.Methods.TryGetValue(name, out var overloads))
@@ -387,6 +405,7 @@ public sealed class SemanticAnalyzer
         }
         return null;
     }
+
 
     private static string? FindFieldType(ClassSymbol cls, string name)
     {

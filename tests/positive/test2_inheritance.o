@@ -16,6 +16,8 @@ class Animal is
     end
     
     method speak : String is
+        var x : Integer(42)
+        x.Print()
         return String("Animal sound")
     end
 end
@@ -34,6 +36,8 @@ class Dog extends Animal is
     end
     
     method speak : String is
+        var x : Integer(30)
+        x.Print()
         return String("Woof!")
     end
 end

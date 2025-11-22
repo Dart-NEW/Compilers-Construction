@@ -10,6 +10,8 @@ class Calculator is
         var product : a.Mult(b)
         var quotient : a.Div(b)
         var remainder : a.Rem(b)
+
+        sum.Print()
         
         var realSum : c.Plus(d)
         var realDiff : c.Minus(d)
