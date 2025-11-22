@@ -294,17 +294,6 @@ public sealed class SemanticAnalyzer
                 var receiverType = AnalyzeExpression(ma.Target, scope, cls);
                 if (ma.Member is CallNode mc && mc.Target is IdentifierNode mname)
                 {
-                    // Проверка Print() - только для Integer, Real, Boolean, String
-                    if (mname.Name == "Print" && mc.Arguments.Count == 0)
-                    {
-                        if (!IsPrimitive(receiverType) && !string.IsNullOrEmpty(receiverType))
-                        {
-                            Report($"Method 'Print' is not defined for type '{receiverType}'.");
-                        }
-                        return "void";
-                    }
-
-                    
                     // Analyze arguments first
                     foreach (var a in mc.Arguments) AnalyzeExpression(a, scope, cls);
                     // Skip strict checking for primitives

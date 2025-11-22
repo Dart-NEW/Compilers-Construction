@@ -864,7 +864,9 @@ internal sealed class IlGenerator
                     _emittedReturn = true;
                     break;
                 case ExpressionStatementNode expr:
-                    EmitExpression(expr.Expression, discardResult: true);
+                    var exprType = EmitExpression(expr.Expression);
+                    if (exprType != TypeInfo.Void)
+                        _sb.AppendLine("      pop");
                     break;
                 case IfNode ifNode:
                     EmitIf(ifNode);
@@ -923,6 +925,7 @@ internal sealed class IlGenerator
                 ConstructorCallNode ctor => ctor.ClassName,
                 IdentifierNode id when _locals.TryGetValue(id.Name, out var local) => local.Type.SourceName,
                 IdentifierNode id when _parameters.TryGetValue(id.Name, out var parameter) => parameter.Type.SourceName,
+                IdentifierNode id => _class.FindField(id.Name)?.Type.SourceName ?? "Object",
                 MemberAccessNode member => InferMemberAccessType(member),
                 _ => "Object"
             };
@@ -1089,35 +1092,32 @@ internal sealed class IlGenerator
             {
                 if (_locals.TryGetValue(id.Name, out var local))
                 {
-                    var valueType = EmitExpression(assignment.Value);
+                    EmitExpression(assignment.Value);
                     _sb.AppendLine($"      stloc V_{local.Slot}");
-                    // stloc doesn't leave value on stack, so return void if discarding
-                    return discardResult ? TypeInfo.Void : valueType;
+                    return TypeInfo.Void;
                 }
 
                 if (_parameters.TryGetValue(id.Name, out var parameter))
                 {
-                    var valueType = EmitExpression(assignment.Value);
+                    EmitExpression(assignment.Value);
                     EmitStoreArgument(parameter.Index);
-                    // starg doesn't leave value on stack
-                    return discardResult ? TypeInfo.Void : valueType;
+                    return TypeInfo.Void;
                 }
 
                 var field = _class.FindField(id.Name);
                 if (field is not null)
                 {
                     EmitLoadThis();
-                    var valueType = EmitExpression(assignment.Value);
+                    EmitExpression(assignment.Value);
                     _sb.AppendLine($"      stfld {field.Type.IlName} {_class.GetQualifiedName()}::{_owner.EscapeIlIdentifier(field.Name)}");
-                    // stfld doesn't leave value on stack, so return void if discarding
-                    return discardResult ? TypeInfo.Void : valueType;
+                    return TypeInfo.Void;
                 }
             }
 
             if (assignment.Target is MemberAccessNode member && member.Member is IdentifierNode fieldName)
             {
                 EmitExpression(member.Target);
-                var valueType = EmitExpression(assignment.Value);
+                EmitExpression(assignment.Value);
                 var receiverType = InferType(member.Target);
                 if (_owner.TryResolveClass(receiverType, out var receiverClass))
                 {
@@ -1125,11 +1125,10 @@ internal sealed class IlGenerator
                     if (field is not null)
                     {
                         _sb.AppendLine($"      stfld {field.Type.IlName} {receiverClass.GetQualifiedName()}::{_owner.EscapeIlIdentifier(field.Name)}");
-                        // stfld doesn't leave value on stack
-                        return discardResult ? TypeInfo.Void : valueType;
+                        return TypeInfo.Void;
                     }
                 }
-                return valueType;
+                return TypeInfo.Void;
             }
 
             EmitExpression(assignment.Value);
@@ -1142,18 +1141,18 @@ internal sealed class IlGenerator
         {
             if (member.Member is CallNode call && call.Target is IdentifierNode methodName)
             {
-                // Handle built-in Print() method
-                if (methodName.Name == "Print" && call.Arguments.Count == 0)
+                var receiverTypeName2 = InferType(member.Target);
+                
+                // Handle built-in Print() method for primitives
+                if (methodName.Name == "Print" && call.Arguments.Count == 0 && IsPrimitive(receiverTypeName2))
                 {
                     var receiverType = EmitExpression(member.Target);
                     _sb.AppendLine($"      call void [mscorlib]System.Console::WriteLine({receiverType.IlName})");
                     return TypeInfo.Void;
                 }
                 
-                var receiverTypeName = InferType(member.Target);
-                
                 // Handle built-in Integer methods
-                if (receiverTypeName == "Integer")
+                if (receiverTypeName2 == "Integer" && methodName.Name != "Print")
                 {
                     EmitExpression(member.Target);
                     var argType = call.Arguments.Count > 0 ? InferType(call.Arguments[0]) : "";
@@ -1221,7 +1220,7 @@ internal sealed class IlGenerator
                 }
                 
                 // Handle built-in Real methods
-                if (receiverTypeName == "Real")
+                if (receiverTypeName2 == "Real")
                 {
                     EmitExpression(member.Target);
                     var argType = call.Arguments.Count > 0 ? InferType(call.Arguments[0]) : "";
@@ -1284,7 +1283,7 @@ internal sealed class IlGenerator
                 }
                 
                 // Handle built-in Boolean methods
-                if (receiverTypeName == "Boolean")
+                if (receiverTypeName2 == "Boolean")
                 {
                     EmitExpression(member.Target);
                     
@@ -1313,9 +1312,9 @@ internal sealed class IlGenerator
                 }
                 
                 // Existing code for user-defined classes
-                var receiverType2 = EmitExpression(member.Target);
-                if (_owner.TryResolveClass(receiverTypeName, out var receiverClass))
+                if (_owner.TryResolveClass(receiverTypeName2, out var receiverClass))
                 {
+                    var receiverType2 = EmitExpression(member.Target);
                     var method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
                     var returnType = method is null || string.IsNullOrWhiteSpace(method.ReturnType)
                         ? TypeInfo.Void
@@ -1329,7 +1328,7 @@ internal sealed class IlGenerator
                     _sb.AppendLine($"      callvirt instance {returnType.IlName} {receiverClass.GetQualifiedName()}::{escapedMethodName}({argumentSignature})");
                     return returnType;
                 }
-                return receiverType2;
+                return TypeInfo.Object;
             }
             else if (member.Member is IdentifierNode fieldName)
             {
