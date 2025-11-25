@@ -257,7 +257,7 @@ internal sealed class IlGenerator
     private void EmitRuntimeEntryPoint(StringBuilder sb, ProgramNode program)
     {
         var exitLabel = NewLabel("EXIT");
-        var argErrorLabel = "IL_ARG_ERROR";
+        var argErrorLabel = NewLabel("ARG_ERROR");
         
         // Найти класс Main
         var mainClass = program.Classes.FirstOrDefault(c => c.Name == "Main");
@@ -306,7 +306,7 @@ internal sealed class IlGenerator
             sb.AppendLine("    ldlen");
             sb.AppendLine("    conv.i4");
             sb.AppendLine($"    ldc.i4 {paramCount + 1}");
-            sb.AppendLine($"    bne.un.s {argErrorLabel}");
+            sb.AppendLine($"    bne.un {argErrorLabel}");
             
             for (int i = 0; i < paramCount; i++)
             {
@@ -340,6 +340,11 @@ internal sealed class IlGenerator
             sb.AppendLine($"  {doneLabel}:");
         }
         
+        sb.AppendLine($"  {argErrorLabel}:");
+        sb.AppendLine("    ldstr \"Error: Invalid number of arguments\"");
+        sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
+        sb.AppendLine("    ret");
+        
         sb.AppendLine("  IL_NO_ARGS:");
         if (mainClass != null)
         {
@@ -366,11 +371,6 @@ internal sealed class IlGenerator
             sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
             sb.AppendLine("    ret");
         }
-        
-        sb.AppendLine($"  {argErrorLabel}:");
-        sb.AppendLine("    ldstr \"Error: Invalid number of arguments\"");
-        sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
-        sb.AppendLine("    ret");
         
         sb.AppendLine($"  {exitLabel}:");
         sb.AppendLine("    ret");
