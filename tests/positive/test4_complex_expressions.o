@@ -7,7 +7,7 @@ class ExpressionEvaluator is
         x := Integer(10)
         y := Integer(5)
         z := Real(2.5)
-        evaluateComplexExpressions()
+        this.evaluateComplexExpressions()
     end
     
     method evaluateComplexExpressions is
@@ -65,6 +65,7 @@ class ExpressionEvaluator is
         var divisor : Real(2.0)
         
         var result : base.Mult(multiplier).Div(divisor).Plus(Real(5.0)).Mult(Real(0.5))
+        result.Print()
         return result
     end
 end

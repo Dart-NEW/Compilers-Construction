@@ -1,0 +1,8 @@
+class TestList is
+    this() is
+        var nums : List[Integer]()
+        nums := nums.append(Integer(5))
+        var first : nums.head()
+        first.Print()
+    end
+end

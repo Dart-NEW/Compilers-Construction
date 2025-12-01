@@ -91,6 +91,7 @@ class TestMethodChaining is
         
         var stringProc : StringProcessor(String("Hello"))
         var result2 : stringProc.append(String(" World")).prepend(String("Say: ")).getText()
+        result2.Print()
         
         var calc : Calculator()
         var result3 : calc.setValue(Real(5.0)).add(Real(3.0)).multiply(Real(2.0)).square().getResult()

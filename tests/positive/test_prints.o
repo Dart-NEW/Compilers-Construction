@@ -1,0 +1,12 @@
+class StringTest is
+    this is
+        var msg : String("Hello, World!")
+        msg.Print()
+        
+        var num : Integer(42)
+        num.Print()
+        
+        var pi : Real(3.14159)
+        pi.Print()
+    end
+end

@@ -51,10 +51,16 @@ class TestBooleanOperations is
         var logic : BooleanLogic()
         
         var andResult : logic.testAnd()
+        andResult.Print()
         var orResult : logic.testOr()
+        orResult.Print()
         var xorResult : logic.testXor()
+        xorResult.Print()
         var notResult : logic.testNot()
+        notResult.Print()
         var complexResult : logic.complexLogic()
+        complexResult.Print()
         var comparisonResult : logic.comparisonLogic()
+        comparisonResult.Print()
     end
 end

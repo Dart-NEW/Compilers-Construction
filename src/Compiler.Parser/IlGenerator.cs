@@ -296,7 +296,9 @@ internal sealed class IlGenerator
             sb.AppendLine("    ldloc V_0");
             sb.AppendLine($"    ldstr \"{className}\"");
             sb.AppendLine("    call bool [mscorlib]System.String::op_Equality(string, string)");
-            sb.AppendLine($"    brfalse.s {doneLabel}");
+            sb.AppendLine($"    brtrue.s IL_{className}_MATCH");
+            sb.AppendLine($"    br.s {doneLabel}");
+            sb.AppendLine($"  IL_{className}_MATCH:");
             
             var constructors = cls.Members.OfType<ConstructorNode>().ToList();
             var ctor = constructors.Count > 0 ? constructors[0] : null;
@@ -335,13 +337,17 @@ internal sealed class IlGenerator
             
             sb.AppendLine($"    newobj instance void {qualifiedName}::.ctor({paramTypes})");
             sb.AppendLine("    pop");
-            sb.AppendLine($"    br.s {exitLabel}");
+            sb.AppendLine($"    br {exitLabel}");
             
             sb.AppendLine($"  {doneLabel}:");
         }
         
+        sb.AppendLine("    ldstr \"Error: Class not found\"");
+        sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
+        sb.AppendLine("    ret");
+        
         sb.AppendLine($"  {argErrorLabel}:");
-        sb.AppendLine("    ldstr \"Error: Invalid number of arguments\"");
+        sb.AppendLine("    ldstr \"Error: Class not found or invalid number of arguments\"");
         sb.AppendLine("    call void [mscorlib]System.Console::WriteLine(string)");
         sb.AppendLine("    ret");
         
@@ -356,7 +362,7 @@ internal sealed class IlGenerator
             {
                 sb.AppendLine($"    newobj instance void {mainQualifiedName}::.ctor()");
                 sb.AppendLine("    pop");
-                sb.AppendLine($"    br.s {exitLabel}");
+                sb.AppendLine($"    br {exitLabel}");
             }
             else
             {
@@ -577,6 +583,36 @@ internal sealed class IlGenerator
         if (string.IsNullOrWhiteSpace(sourceType))
             return TypeInfo.Object;
 
+        // Handle Array[T]
+        if (sourceType.StartsWith("Array[") && sourceType.EndsWith("]"))
+        {
+            var elementType = sourceType.Substring(6, sourceType.Length - 7);
+            var ilType = elementType switch
+            {
+                "Integer" => "int32",
+                "Real" => "float64",
+                "Boolean" => "int32",
+                "String" => "string",
+                _ => $"class {_options.Namespace}.{elementType}"
+            };
+            return new TypeInfo(sourceType, $"{ilType}[]", false);
+        }
+
+        // Handle List[T]
+        if (sourceType.StartsWith("List[") && sourceType.EndsWith("]"))
+        {
+            var elementType = sourceType.Substring(5, sourceType.Length - 6);
+            var ilType = elementType switch
+            {
+                "Integer" => "int32",
+                "Real" => "float64",
+                "Boolean" => "int32",
+                "String" => "string",
+                _ => $"class {_options.Namespace}.{elementType}"
+            };
+            return new TypeInfo(sourceType, $"class [mscorlib]System.Collections.Generic.List`1<{ilType}>", false);
+        }
+
         return sourceType switch
         {
             "Integer" => TypeInfo.Int32,
@@ -690,6 +726,17 @@ internal sealed class IlGenerator
             if (method is not null)
                 return method;
             return BaseClass?.FindMethod(name, arity);
+        }
+        
+        public MethodNode? FindMethod(string name, List<string> paramTypes)
+        {
+            var method = _methods.FirstOrDefault(m => 
+                string.Equals(m.Name, name, StringComparison.Ordinal) &&
+                m.Parameters.Count == paramTypes.Count &&
+                m.Parameters.Zip(paramTypes, (p, t) => string.Equals(p.Type, t, StringComparison.Ordinal)).All(x => x));
+            if (method is not null)
+                return method;
+            return BaseClass?.FindMethod(name, paramTypes);
         }
 
         public ConstructorNode? FindConstructor(int arity)
@@ -864,8 +911,8 @@ internal sealed class IlGenerator
                     _emittedReturn = true;
                     break;
                 case ExpressionStatementNode expr:
-                    var exprType = EmitExpression(expr.Expression);
-                    if (exprType != TypeInfo.Void)
+                    var type = EmitExpression(expr.Expression);
+                    if (type != TypeInfo.Void)
                         _sb.AppendLine("      pop");
                     break;
                 case IfNode ifNode:
@@ -922,20 +969,62 @@ internal sealed class IlGenerator
                 RealLiteralNode => "Real",
                 BooleanLiteralNode => "Boolean",
                 StringLiteralNode => "String",
+                ThisNode => _class.Name,
                 ConstructorCallNode ctor => ctor.ClassName,
                 IdentifierNode id when _locals.TryGetValue(id.Name, out var local) => local.Type.SourceName,
                 IdentifierNode id when _parameters.TryGetValue(id.Name, out var parameter) => parameter.Type.SourceName,
                 IdentifierNode id => _class.FindField(id.Name)?.Type.SourceName ?? "Object",
+                MemberAccessNode member when member.Member is IdentifierNode fieldName => InferFieldAccessType(member, fieldName),
                 MemberAccessNode member => InferMemberAccessType(member),
                 _ => "Object"
             };
         }
+
+        private string InferFieldAccessType(MemberAccessNode member, IdentifierNode fieldName)
+        {
+            var receiverType = InferType(member.Target);
+            if (_owner.TryResolveClass(receiverType, out var receiverClass))
+            {
+                var field = receiverClass.FindField(fieldName.Name);
+                if (field is not null)
+                    return field.Type.SourceName;
+            }
+            return "Object"
+;        }
 
         private string InferMemberAccessType(MemberAccessNode member)
         {
             if (member.Member is CallNode call && call.Target is IdentifierNode methodName)
             {
                 var receiverType = InferType(member.Target);
+                
+                // Handle Array methods
+                if (receiverType.StartsWith("Array["))
+                {
+                    var elementType = receiverType.Substring(6, receiverType.Length - 7);
+                    return methodName.Name switch
+                    {
+                        "Length" => "Integer",
+                        "get" => elementType,
+                        "set" => "void",
+                        "Print" => "void",
+                        _ => "Object"
+                    };
+                }
+                
+                // Handle List methods
+                if (receiverType.StartsWith("List["))
+                {
+                    var elementType = receiverType.Substring(5, receiverType.Length - 6);
+                    return methodName.Name switch
+                    {
+                        "Length" => "Integer",
+                        "head" => elementType,
+                        "tail" => receiverType,
+                        "append" => receiverType,
+                        _ => "Object"
+                    };
+                }
                 
                 if (receiverType == "Integer")
                 {
@@ -951,6 +1040,7 @@ internal sealed class IlGenerator
                     }
                     return methodName.Name switch
                     {
+                        "Print" => "void",
                         "Rem" => "Integer",
                         "Less" or "Greater" or "Equal" or "LessEqual" or "GreaterEqual" => "Boolean",
                         "toReal" => "Real",
@@ -963,6 +1053,7 @@ internal sealed class IlGenerator
                 {
                     return methodName.Name switch
                     {
+                        "Print" => "void",
                         "Plus" or "Minus" or "Mult" or "Div" => "Real",
                         "Less" or "Greater" or "Equal" or "LessEqual" or "GreaterEqual" => "Boolean",
                         "toInteger" => "Integer",
@@ -975,25 +1066,54 @@ internal sealed class IlGenerator
                 {
                     return methodName.Name switch
                     {
+                        "Print" => "void",
                         "And" or "Or" or "Xor" or "Not" => "Boolean",
+                        "toInteger" => "Integer",
+                        _ => "Object"
+                    };
+                }
+                
+                if (receiverType == "String")
+                {
+                    return methodName.Name switch
+                    {
+                        "Print" => "void",
+                        "Plus" => "String",
                         _ => "Object"
                     };
                 }
                 
                 if (_owner.TryResolveClass(receiverType, out var receiverClass))
                 {
-                    var method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
-                    if (method is not null && !string.IsNullOrWhiteSpace(method.ReturnType))
-                        return method.ReturnType;
+                    // Try to find method by parameter types for overload resolution
+                    var argTypes = call.Arguments.Select(arg => InferType(arg)).ToList();
+                    var method = receiverClass.FindMethod(methodName.Name, argTypes);
+                    
+                    // Fallback to arity-based lookup
+                    if (method is null)
+                        method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
+                    
+                    if (method is not null)
+                        return string.IsNullOrWhiteSpace(method.ReturnType) ? "void" : method.ReturnType;
+                }
+            }
+            else if (member.Member is IdentifierNode fieldName)
+            {
+                var receiverType = InferType(member.Target);
+                if (_owner.TryResolveClass(receiverType, out var receiverClass))
+                {
+                    var field = receiverClass.FindField(fieldName.Name);
+                    if (field is not null)
+                        return field.Type.SourceName;
                 }
             }
             
             return "Object";
         }
 
-        private TypeInfo EmitExpression(ExpressionNode expression, bool discardResult = false)
+        private TypeInfo EmitExpression(ExpressionNode expression)
         {
-            var type = expression switch
+            return expression switch
             {
                 IntegerLiteralNode literal => EmitIntegerLiteral(literal),
                 RealLiteralNode real => EmitRealLiteral(real),
@@ -1001,18 +1121,12 @@ internal sealed class IlGenerator
                 StringLiteralNode str => EmitStringLiteral(str),
                 ThisNode => EmitThis(),
                 IdentifierNode id => EmitIdentifier(id),
-                AssignmentNode assignment => EmitAssignment(assignment, discardResult),
+                AssignmentNode assignment => EmitAssignment(assignment),
                 MemberAccessNode member => EmitMemberAccess(member),
                 ConstructorCallNode ctor => EmitConstructorCall(ctor),
                 CallNode call => EmitCall(call),
                 _ => TypeInfo.Object
             };
-
-            // Only pop if the expression actually left a value on the stack
-            if (discardResult && type != TypeInfo.Void)
-                _sb.AppendLine("      pop");
-
-            return type;
         }
 
         private TypeInfo EmitIntegerLiteral(IntegerLiteralNode literal)
@@ -1086,7 +1200,7 @@ internal sealed class IlGenerator
             return TypeInfo.Object;
         }
 
-        private TypeInfo EmitAssignment(AssignmentNode assignment, bool discardResult)
+        private TypeInfo EmitAssignment(AssignmentNode assignment)
         {
             if (assignment.Target is IdentifierNode id)
             {
@@ -1132,8 +1246,6 @@ internal sealed class IlGenerator
             }
 
             EmitExpression(assignment.Value);
-            if (!discardResult)
-                _sb.AppendLine("      dup");
             return TypeInfo.Object;
         }
 
@@ -1142,6 +1254,112 @@ internal sealed class IlGenerator
             if (member.Member is CallNode call && call.Target is IdentifierNode methodName)
             {
                 var receiverTypeName2 = InferType(member.Target);
+                
+                // Handle Array methods
+                if (receiverTypeName2.StartsWith("Array["))
+                {
+                    var elementType = receiverTypeName2.Substring(6, receiverTypeName2.Length - 7);
+                    var ilElementType = elementType switch
+                    {
+                        "Integer" => "int32",
+                        "Real" => "float64",
+                        "Boolean" => "int32",
+                        "String" => "string",
+                        _ => $"class {_owner._options.Namespace}.{elementType}"
+                    };
+                    
+                    if (methodName.Name == "Length" && call.Arguments.Count == 0)
+                    {
+                        EmitExpression(member.Target);
+                        _sb.AppendLine("      ldlen");
+                        _sb.AppendLine("      conv.i4");
+                        return TypeInfo.Int32;
+                    }
+                    else if (methodName.Name == "get" && call.Arguments.Count == 1)
+                    {
+                        EmitExpression(member.Target);
+                        EmitExpression(call.Arguments[0]);
+                        _sb.AppendLine($"      ldelem {ilElementType}");
+                        return _owner.ResolveType(elementType);
+                    }
+                    else if (methodName.Name == "set" && call.Arguments.Count == 2)
+                    {
+                        EmitExpression(member.Target);
+                        EmitExpression(call.Arguments[0]);
+                        EmitExpression(call.Arguments[1]);
+                        _sb.AppendLine($"      stelem {ilElementType}");
+                        return TypeInfo.Void;
+                    }
+                    else if (methodName.Name == "Print" && call.Arguments.Count == 0)
+                    {
+                        _sb.AppendLine($"      ldstr \"Array[{elementType}]\"");
+                        _sb.AppendLine("      call void [mscorlib]System.Console::WriteLine(string)");
+                        return TypeInfo.Void;
+                    }
+                }
+                
+                // Handle List methods
+                if (receiverTypeName2.StartsWith("List["))
+                {
+                    var elementType = receiverTypeName2.Substring(5, receiverTypeName2.Length - 6);
+                    var ilElementType = elementType switch
+                    {
+                        "Integer" => "int32",
+                        "Real" => "float64",
+                        "Boolean" => "int32",
+                        "String" => "string",
+                        _ => $"class {_owner._options.Namespace}.{elementType}"
+                    };
+                    var listType = $"class [mscorlib]System.Collections.Generic.List`1<{ilElementType}>";
+                    
+                    if (methodName.Name == "Length" && call.Arguments.Count == 0)
+                    {
+                        EmitExpression(member.Target);
+                        _sb.AppendLine($"      callvirt instance int32 {listType}::get_Count()");
+                        return TypeInfo.Int32;
+                    }
+                    else if (methodName.Name == "head" && call.Arguments.Count == 0)
+                    {
+                        EmitExpression(member.Target);
+                        _sb.AppendLine("      ldc.i4.0");
+                        _sb.AppendLine($"      callvirt instance !0 {listType}::get_Item(int32)");
+                        return _owner.ResolveType(elementType);
+                    }
+                    else if (methodName.Name == "tail" && call.Arguments.Count == 0)
+                    {
+                        EmitExpression(member.Target);
+                        _sb.AppendLine("      ldc.i4.1");
+                        EmitExpression(member.Target);
+                        _sb.AppendLine($"      callvirt instance int32 {listType}::get_Count()");
+                        _sb.AppendLine("      ldc.i4.1");
+                        _sb.AppendLine("      sub");
+                        _sb.AppendLine($"      callvirt instance class [mscorlib]System.Collections.Generic.List`1<!0> {listType}::GetRange(int32, int32)");
+                        return _owner.ResolveType(receiverTypeName2);
+                    }
+                    else if (methodName.Name == "append" && call.Arguments.Count == 1)
+                    {
+                        _sb.AppendLine($"      newobj instance void {listType}::.ctor()");
+                        _sb.AppendLine("      dup");
+                        EmitExpression(member.Target);
+                        _sb.AppendLine($"      callvirt instance void {listType}::AddRange(class [mscorlib]System.Collections.Generic.IEnumerable`1<!0>)");
+                        _sb.AppendLine("      dup");
+                        EmitExpression(call.Arguments[0]);
+                        _sb.AppendLine($"      callvirt instance void {listType}::Add(!0)");
+                        return _owner.ResolveType(receiverTypeName2);
+                    }
+                }
+                
+                // Handle String methods
+                if (receiverTypeName2 == "String")
+                {
+                    if (methodName.Name == "Plus" && call.Arguments.Count == 1)
+                    {
+                        EmitExpression(member.Target);
+                        EmitExpression(call.Arguments[0]);
+                        _sb.AppendLine("      call string [mscorlib]System.String::Concat(string, string)");
+                        return TypeInfo.String;
+                    }
+                }
                 
                 // Handle built-in Print() method for primitives
                 if (methodName.Name == "Print" && call.Arguments.Count == 0 && IsPrimitive(receiverTypeName2))
@@ -1308,14 +1526,26 @@ internal sealed class IlGenerator
                             _sb.AppendLine("      ldc.i4.0");
                             _sb.AppendLine("      ceq");
                             return TypeInfo.Boolean;
+                            
+                        case "toInteger":
+                            // Boolean is already int32 in IL
+                            return TypeInfo.Int32;
                     }
                 }
                 
-                // Existing code for user-defined classes
+                // Handle user-defined classes
                 if (_owner.TryResolveClass(receiverTypeName2, out var receiverClass))
                 {
-                    var receiverType2 = EmitExpression(member.Target);
-                    var method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
+                    EmitExpression(member.Target);
+                    
+                    // Infer argument types for overload resolution
+                    var argTypes = call.Arguments.Select(arg => InferType(arg)).ToList();
+                    var method = receiverClass.FindMethod(methodName.Name, argTypes);
+                    
+                    // Fallback to arity-based lookup if type-based fails
+                    if (method is null)
+                        method = receiverClass.FindMethod(methodName.Name, call.Arguments.Count);
+                    
                     var returnType = method is null || string.IsNullOrWhiteSpace(method.ReturnType)
                         ? TypeInfo.Void
                         : _owner.ResolveType(method.ReturnType);
@@ -1328,7 +1558,7 @@ internal sealed class IlGenerator
                     _sb.AppendLine($"      callvirt instance {returnType.IlName} {receiverClass.GetQualifiedName()}::{escapedMethodName}({argumentSignature})");
                     return returnType;
                 }
-                return TypeInfo.Object;
+                return TypeInfo.Void;
             }
             else if (member.Member is IdentifierNode fieldName)
             {
@@ -1356,6 +1586,58 @@ internal sealed class IlGenerator
 
         private TypeInfo EmitConstructorCall(ConstructorCallNode cc)
         {
+            // Check if it's actually a method call (not a constructor)
+            var method = _class.FindMethod(cc.ClassName, cc.Arguments.Count);
+            if (method is not null)
+            {
+                EmitLoadThis();
+                foreach (var argument in cc.Arguments)
+                    EmitExpression(argument);
+                var returnType = string.IsNullOrWhiteSpace(method.ReturnType)
+                    ? TypeInfo.Void
+                    : _owner.ResolveType(method.ReturnType);
+                var argumentSignature = string.Join(", ", method.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
+                var escapedMethodName = _owner.EscapeIlMethodName(cc.ClassName);
+                _sb.AppendLine($"      callvirt instance {returnType.IlName} {_class.GetQualifiedName()}::{escapedMethodName}({argumentSignature})");
+                return returnType;
+            }
+            
+            // Handle Array[T]
+            if (cc.ClassName.StartsWith("Array[") && cc.ClassName.EndsWith("]"))
+            {
+                var elementType = cc.ClassName.Substring(6, cc.ClassName.Length - 7);
+                if (cc.Arguments.Count > 0)
+                {
+                    EmitExpression(cc.Arguments[0]); // array length
+                    var ilType = elementType switch
+                    {
+                        "Integer" => "int32",
+                        "Real" => "float64",
+                        "Boolean" => "int32",
+                        "String" => "string",
+                        _ => $"class {_owner._options.Namespace}.{elementType}"
+                    };
+                    _sb.AppendLine($"      newarr {ilType}");
+                    return new TypeInfo(cc.ClassName, $"{ilType}[]", false);
+                }
+            }
+            
+            // Handle List[T]
+            if (cc.ClassName.StartsWith("List[") && cc.ClassName.EndsWith("]"))
+            {
+                var elementType = cc.ClassName.Substring(5, cc.ClassName.Length - 6);
+                var ilType = elementType switch
+                {
+                    "Integer" => "int32",
+                    "Real" => "float64",
+                    "Boolean" => "int32",
+                    "String" => "string",
+                    _ => $"class {_owner._options.Namespace}.{elementType}"
+                };
+                _sb.AppendLine($"      newobj instance void class [mscorlib]System.Collections.Generic.List`1<{ilType}>::.ctor()");
+                return new TypeInfo(cc.ClassName, $"class [mscorlib]System.Collections.Generic.List`1<{ilType}>", false);
+            }
+            
             // Для примитивных типов
             if (cc.ClassName == "Integer")
             {
@@ -1404,6 +1686,24 @@ internal sealed class IlGenerator
 
         private TypeInfo EmitCall(CallNode call)
         {
+            if (call.Target is IdentifierNode methodName)
+            {
+                var method = _class.FindMethod(methodName.Name, call.Arguments.Count);
+                if (method is not null)
+                {
+                    EmitLoadThis();
+                    foreach (var argument in call.Arguments)
+                        EmitExpression(argument);
+                    var returnType = string.IsNullOrWhiteSpace(method.ReturnType)
+                        ? TypeInfo.Void
+                        : _owner.ResolveType(method.ReturnType);
+                    var argumentSignature = string.Join(", ", method.Parameters.Select(p => _owner.ResolveType(p.Type).IlName));
+                    var escapedMethodName = _owner.EscapeIlMethodName(methodName.Name);
+                    _sb.AppendLine($"      callvirt instance {returnType.IlName} {_class.GetQualifiedName()}::{escapedMethodName}({argumentSignature})");
+                    return returnType;
+                }
+            }
+            
             foreach (var argument in call.Arguments)
                 EmitExpression(argument);
             _sb.AppendLine("      pop");

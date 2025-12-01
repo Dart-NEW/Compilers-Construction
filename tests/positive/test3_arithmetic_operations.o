@@ -1,5 +1,5 @@
 class Calculator is
-    this() is
+    this is
         var a : Integer(10)
         var b : Integer(5)
         var c : Real(3.14)
@@ -10,8 +10,6 @@ class Calculator is
         var product : a.Mult(b)
         var quotient : a.Div(b)
         var remainder : a.Rem(b)
-
-        sum.Print()
         
         var realSum : c.Plus(d)
         var realDiff : c.Minus(d)
@@ -27,11 +25,17 @@ class Calculator is
         
         var converted : a.toReal()
         var backToInt : converted.toInteger()
+        
+        sum.Print()
+        diff.Print()
+        product.Print()
+        quotient.Print()
+        remainder.Print()
     end
 end
 
 class ArrayOperations is
-    this() is
+    this is
         var numbers : Array[Integer](5)
         var i : Integer(0)
         
@@ -46,11 +50,13 @@ class ArrayOperations is
             sum := sum.Plus(numbers.get(i))
             i := i.Plus(Integer(1))
         end
+        
+        sum.Print()
     end
 end
 
 class TestArithmetic is
-    this() is
+    this is
         var calc : Calculator()
         var arrOps : ArrayOperations()
     end

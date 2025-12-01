@@ -218,8 +218,14 @@ public sealed class Parser
             Consume(TokenKind.Is);
             while (!Check(TokenKind.End) && !IsAtEnd())
             {
-                if (Check(TokenKind.Class) || Check(TokenKind.Method) || Check(TokenKind.This))
+                if (Check(TokenKind.Class) || Check(TokenKind.Method))
                     throw new ParseException($"Missing 'end' for method '{name}' - found '{Current().Lexeme}'");
+                if (Check(TokenKind.This))
+                {
+                    var nextKind = (_position + 1) < _tokens.Count ? _tokens[_position + 1].Kind : TokenKind.EndOfFile;
+                    if (nextKind != TokenKind.Dot && nextKind != TokenKind.LParen)
+                        throw new ParseException($"Missing 'end' for method '{name}' - found '{Current().Lexeme}'");
+                }
                 body.Add(ParseStatement());
             }
             if (IsAtEnd())

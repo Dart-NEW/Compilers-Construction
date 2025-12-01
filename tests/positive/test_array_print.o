@@ -1,0 +1,19 @@
+class ArrayPrintTest is
+    this is
+        var numbers : Array[Integer](5)
+        var i : Integer(0)
+        
+        while i.Less(numbers.Length()) loop
+            numbers.set(i, i.Mult(i))
+            i := i.Plus(Integer(1))
+        end
+        
+        numbers.Print()
+        
+        var names : Array[String](3)
+        names.set(Integer(0), String("Alice"))
+        names.set(Integer(1), String("Bob"))
+        names.set(Integer(2), String("Charlie"))
+        names.Print()
+    end
+end

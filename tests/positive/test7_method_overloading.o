@@ -37,7 +37,9 @@ class TestMethodOverloading is
         var calc : Calculator()
         
         var intResult : calc.add(Integer(10))
+        intResult.Print()
         var realResult : calc.add(Real(3.14))
+        realResult.Print()
         
         var intMult : calc.multiply(Integer(2))
         var realMult : calc.multiply(Real(1.5))

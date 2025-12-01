@@ -46,7 +46,8 @@ class ListManager is
     
     method processList : Integer is
         var sum : Integer(0)
-        var current : numbers
+        var current : List[Integer]()
+        current := numbers
         
         while current.Length().Greater(Integer(0)) loop
             sum := sum.Plus(current.head())
@@ -62,11 +63,13 @@ class TestListOperations is
         var manager : ListManager()
         
         var firstNum : manager.getFirstNumber()
+        firstNum.Print()
         var firstStr : manager.getFirstString()
         var restNums : manager.getRestNumbers()
         var restStrs : manager.getRestStrings()
         
         var newNumbers : manager.addNumber(Integer(10))
+        newNumbers.tail().head().Print()
         var newStrings : manager.addString(String("Fourth"))
         
         var totalSum : manager.processList()

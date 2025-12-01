@@ -1,0 +1,17 @@
+class ArrayTest is
+    this is
+        var numbers : Array[Integer](5)
+        var i : Integer(0)
+        
+        while i.Less(numbers.Length()) loop
+            numbers.set(i, i.Mult(i))
+            i := i.Plus(Integer(1))
+        end
+        
+        i := Integer(0)
+        while i.Less(numbers.Length()) loop
+            numbers.get(i).Print()
+            i := i.Plus(Integer(1))
+        end
+    end
+end

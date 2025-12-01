@@ -41,7 +41,10 @@ class TestConstructors is
         var rect3 : Rectangle(Integer(10), Integer(8))
         
         var area1 : rect1.getArea()
+        area1.Print()
         var area2 : rect2.getArea()
+        area2.Print()
         var area3 : rect3.getArea()
+        area3.Print()
     end
 end
