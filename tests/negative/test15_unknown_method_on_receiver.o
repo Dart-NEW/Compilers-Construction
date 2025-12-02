@@ -1,7 +1,4 @@
 class A is
-    method noSuchMethod is
-        var a : Integer
-    end
 end
 
 class B is

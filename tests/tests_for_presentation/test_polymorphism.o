@@ -1,0 +1,37 @@
+class Point is
+    var x : Integer
+    var y : Integer
+    
+    this(px : Integer, py : Integer) is
+        x := px
+        y := py
+    end
+    
+    method Print is
+        this.x.Print()
+        this.y.Print()
+    end
+end
+
+class Point2 extends Point is
+    var x : Integer
+    var y : Integer
+
+    this(px : Integer, py : Integer) is
+        x := px
+        y := py
+    end
+end
+
+class Main is
+    this is
+        var p : Point(1,2)
+        this.PrintPoint(p)
+        var p2 : Point2(10, 20)
+        this.PrintPoint(p2)
+    end
+
+    method PrintPoint(p: Point) is
+        p.Print()
+    end
+end

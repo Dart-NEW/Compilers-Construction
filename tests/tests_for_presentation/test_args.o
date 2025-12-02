@@ -1,0 +1,38 @@
+class Person is
+    var name : String
+    var age : Integer
+    
+    this(personName : String, personAge : Integer) is
+        name := personName
+        age := personAge
+        this.greet()
+    end
+    
+    method greet is
+        name.Print()
+        age.Print()
+    end
+end
+
+class Calculator is
+    var a : Integer
+    var b : Integer
+    
+    this(x : Integer, y : Integer) is
+        a := x
+        b := y
+        this.add()
+    end
+    
+    method add is
+        var result : a.Plus(b)
+        result.Print()
+    end
+end
+
+class Main is
+    this is
+        var msg : String("Hello from Main!")
+        msg.Print()
+    end
+end

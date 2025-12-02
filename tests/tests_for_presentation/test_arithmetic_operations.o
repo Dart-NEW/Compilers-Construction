@@ -1,0 +1,63 @@
+class Calculator is
+    this is
+        var a : Integer(10)
+        var b : Integer(5)
+        var c : Real(3.14)
+        var d : Real(2.5)
+        
+        var sum : a.Plus(b)
+        var diff : a.Minus(b)
+        var product : a.Mult(b)
+        var quotient : a.Div(b)
+        var remainder : a.Rem(b)
+        
+        var realSum : c.Plus(d)
+        var realDiff : c.Minus(d)
+        var realProduct : c.Mult(d)
+        var realQuotient : c.Div(d)
+        
+        var mixedSum : a.Plus(c)
+        var mixedProduct : c.Mult(b)
+        
+        var isGreater : a.Greater(b)
+        var isEqual : a.Equal(b)
+        var isLess : a.Less(b)
+        
+        var converted : a.toReal()
+        var backToInt : converted.toInteger()
+        
+        sum.Print()
+        diff.Print()
+        product.Print()
+        quotient.Print()
+        remainder.Print()
+    end
+end
+
+class ArrayOperations is
+    this is
+        var numbers : Array[Integer](5)
+        var i : Integer(0)
+        
+        while i.Less(numbers.Length()) loop
+            numbers.set(i, i.Mult(i))
+            i := i.Plus(Integer(1))
+        end
+        
+        var sum : Integer(0)
+        i := Integer(0)
+        while i.Less(numbers.Length()) loop
+            sum := sum.Plus(numbers.get(i))
+            i := i.Plus(Integer(1))
+        end
+        
+        sum.Print()
+    end
+end
+
+class TestArithmetic is
+    this is
+        var calc : Calculator()
+        var arrOps : ArrayOperations()
+    end
+end
